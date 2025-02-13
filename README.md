@@ -14,4 +14,4 @@ This project is implemented on Ubuntu 24.04
 ## Tools used:
 
 1) QEMU Virtual Machine to emulate the hardware
-2) OpenSBI - I don't quite understand what this means yet
+2) OpenSBI - for the QEMU virtual machine, this acts as a BIOS
