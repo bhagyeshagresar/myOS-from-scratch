@@ -15,3 +15,5 @@ This project is implemented on Ubuntu 24.04
 
 1) QEMU Virtual Machine to emulate the hardware
 2) OpenSBI - for the QEMU virtual machine, this acts as a BIOS
+
+3) test
