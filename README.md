@@ -22,4 +22,5 @@ This project is implemented on Ubuntu 24.04
 = modifier: This specifies that the operand is write-only. The compiler is informed that the inline assembly code will overwrite the contents of the registers without needing to read their previous values.
 r constraint: This tells the compiler that the operand should be placed in a general-purpose register. The compiler is free to choose any available general-purpose register to fulfill this requirement.
 
-
+## printf() function
+Handles string, signed integers and hexadecimal format
