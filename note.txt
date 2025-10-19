@@ -88,3 +88,17 @@ Ans:
 Linker: After all files are compiled, the linker looks for the actual code (the definition) of putchar in all object files, 
 finds it in the object file derived from kernel.c, and connects the call site in your printf code to the actual sbi_call logic.
 (response from Gemini but seems correct)
+
+
+Why is (void*)0 a valid expression in C ?
+Ans: 
+The C standard explicitly states a unique rule for the integer constant 0:
+
+    An integer constant expression with the value 0, or such an expression cast to type void *, is called a null pointer constant.
+
+This means that 0, when used in a pointer context (like assignment or a cast), is not treated as a normal integer value; 
+it is guaranteed to be a valid constant that represents "no memory location".
+
+Valid Syntax	Meaning
+(void *)5	This is valid syntax. It casts the integer value 5 to a pointer type, creating a pointer that points to memory address 5. This is common in low-level programming (like your kernel/driver work) for accessing memory-mapped registers, but it should generally be avoided in application code.
+(void *)0	This is the specific case that creates the null pointer constant.
