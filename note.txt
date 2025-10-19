@@ -1,0 +1,90 @@
+We need the ecall (Environment Call) instruction because it is the fundamental mechanism for crossing privilege boundaries in RISC-V. This is essential for the security and stability of the system, enabling two core functions: System Calls and Firmware Calls (SBI).
+
+Here's a breakdown of why this mechanism is necessary:
+
+1. Security and Isolation (Privilege Levels)
+
+The RISC-V architecture defines multiple privilege levels to isolate different parts of the software. The key levels involved here are:
+Level	Name	Purpose
+M-mode	Machine Mode (Most Privileged)	Runs the firmware (like OpenSBI). It controls all hardware resources (clocks, interrupts, memory protection).
+S-mode	Supervisor Mode	Runs the kernel (the operating system). It manages memory, processes, and provides a protected environment for applications.
+U-mode	User Mode (Least Privileged)	Runs applications and user programs. It has limited access to system resources.
+
+If the low-privileged code (like your kernel in S-mode) could directly access or modify critical hardware (like the clock or UART), a bug or malicious program could crash the entire system or compromise security.
+
+The ecall instruction enforces this isolation:
+
+    It acts as a controlled "gate" that forces the CPU to stop executing the low-privileged code and jump to a pre-defined, trusted handler in the higher-privileged code.
+
+    This handler then validates the request and performs the operation on the caller's behalf.
+
+2. Abstraction and Access to Resources
+
+The ecall is used to implement two critical interfaces:
+
+A. Firmware Calls (SBI)
+
+Your example demonstrates this use. The kernel (S-mode) needs to perform an operation only the M-mode firmware (OpenSBI) is allowed to do, such as:
+
+    Console I/O: Sending a character to the console (Console Putchar).
+
+    Time Management: Setting a timer interrupt.
+
+    Power Management: Entering a low-power state (wfi is often implemented this way or closely tied to the SBI).
+
+The kernel uses ecall to execute the Supervisor Binary Interface (SBI). This abstracts the low-level, machine-specific hardware details away from the kernel, ensuring the kernel remains portable across different RISC-V platforms.
+
+B. System Calls (Kernel Services)
+
+While your code is using ecall for SBI, the same instruction is used by User Applications (U-mode) to request services from the Operating System Kernel (S-mode). For example, when a C program calls read() or fork(), it's compiled into an ecall instruction to switch from U-mode to S-mode.
+
+In both cases (U-mode → S-mode, or S-mode → M-mode), the ecall is the only way to request services that require greater privilege.
+
+
+
+The Function ID (FID), which is the value 0 in this specific call, is used to select a particular function within a specified Extension ID (EID) of the RISC-V Supervisor Binary Interface (SBI).
+
+In your putchar call:
+
+
+void putchar(char ch) { 
+    sbi_call(ch, 0, 0, 0, 0, 0, 0, 1 /* Console Putchar */); 
+    // Argument 7: FID (a6) is 0
+    // Argument 8: EID (a7) is 1
+}
+
+Role of the Function ID (FID)
+
+The SBI is structured hierarchically to allow for extensibility. The two-part ID system tells the OpenSBI firmware exactly what service is being requested:
+
+    Extension ID (EID) → Service Category: The last argument, 1 (in register a7), selects the Base Extension. This tells the firmware, "The kernel wants to do a fundamental, basic operation."
+
+    Function ID (FID) → Specific Function: The second-to-last argument, 0 (in register a6), specifies the exact function within that Base Extension.
+
+FID (a6)	Function Name	Purpose
+0	sbi_console_putchar	Outputs a single character. (This is the one being used.)
+1	sbi_console_getchar	Reads a single character.
+2	sbi_clear_ipi	Clears an Inter-Processor Interrupt.
+...	...	(Other functions)
+
+TIP(from the project link)
+
+Life of Hello World:
+
+When SBI is called, characters will be displayed as follows:
+
+    The kernel executes ecall instruction. The CPU jumps to the M-mode trap handler (mtvec register), which is set by OpenSBI during startup.
+    After saving registers, the trap handler written in C is called.
+    Based on the eid, the corresponding SBI processing function is called.
+    The device driver for the 8250 UART (Wikipedia) sends the character to QEMU.
+    QEMU's 8250 UART emulation implementation receives the character and sends it to the standard output.
+    The terminal emulator displays the character.
+
+That is, by calling Console Putchar function is not a magic at all - it just uses the device driver implemented in OpenSBI!
+
+
+why just the function signature for putchar is enough in common.c?
+Ans:
+Linker: After all files are compiled, the linker looks for the actual code (the definition) of putchar in all object files, 
+finds it in the object file derived from kernel.c, and connects the call site in your printf code to the actual sbi_call logic.
+(response from Gemini but seems correct)
