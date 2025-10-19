@@ -102,3 +102,16 @@ it is guaranteed to be a valid constant that represents "no memory location".
 Valid Syntax	Meaning
 (void *)5	This is valid syntax. It casts the integer value 5 to a pointer type, creating a pointer that points to memory address 5. This is common in low-level programming (like your kernel/driver work) for accessing memory-mapped registers, but it should generally be avoided in application code.
 (void *)0	This is the specific case that creates the null pointer constant.
+
+
+The dangling else:
+
+if (error_flag)
+    {
+        printf("PANIC: ...");
+        while(1){}
+    }; // <-- The semicolon following the macro
+else // <-- ERROR: This 'else' is not attached to the previous 'if'
+    printf("Success");
+
+The compiler sees the block terminated by a semicolon, making the else a separate, unmatched token, which is a syntax error known as a dangling else.
