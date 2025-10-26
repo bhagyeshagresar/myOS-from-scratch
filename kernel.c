@@ -70,3 +70,46 @@ void boot(void){
         : [stack_top] "r" (__stack_top) // Pass the stack top address as %[stack_top]
     );
 }
+
+//Kernel exception handler. Store the address of this function in stvec register
+__attribute__((naked))
+__attribute__((aligned(4)))
+void kernel_entry(void){
+    __asm__ __volatile(
+        "csrw sscratch, sp\n"       //temporarily save user mode stack pointer at the time of exception occurrence
+        "addi sp, sp, -4*31\n"      //move the stack pointer down by 4x31 = 124 bytes(allocation)
+        "sw ra, 4*0(sp)\n"          //store the value of ra at an offset of 0bytes from the address held in sp. do the same for all the
+        "sw gp,  4 * 1(sp)\n"       //these are the general purpose registers of the interrupted task and are stored in the newly created
+        "sw tp,  4 * 2(sp)\n"       //kernel stack
+        "sw t0,  4 * 3(sp)\n"
+        "sw t1,  4 * 4(sp)\n"
+        "sw t2,  4 * 5(sp)\n"
+        "sw t3,  4 * 6(sp)\n"
+        "sw t4,  4 * 7(sp)\n"
+        "sw t5,  4 * 8(sp)\n"
+        "sw t6,  4 * 9(sp)\n"
+        "sw a0,  4 * 10(sp)\n"
+        "sw a1,  4 * 11(sp)\n"
+        "sw a2,  4 * 12(sp)\n"
+        "sw a3,  4 * 13(sp)\n"
+        "sw a4,  4 * 14(sp)\n"
+        "sw a5,  4 * 15(sp)\n"
+        "sw a6,  4 * 16(sp)\n"
+        "sw a7,  4 * 17(sp)\n"
+        "sw s0,  4 * 18(sp)\n"
+        "sw s1,  4 * 19(sp)\n"
+        "sw s2,  4 * 20(sp)\n"
+        "sw s3,  4 * 21(sp)\n"
+        "sw s4,  4 * 22(sp)\n"
+        "sw s5,  4 * 23(sp)\n"
+        "sw s6,  4 * 24(sp)\n"
+        "sw s7,  4 * 25(sp)\n"
+        "sw s8,  4 * 26(sp)\n"
+        "sw s9,  4 * 27(sp)\n"
+        "sw s10, 4 * 28(sp)\n"
+        "sw s11, 4 * 29(sp)\n"
+
+        "csrr a0, sscratch\n"      //the user mode's stack poiinter at the point of exception is stored in a0
+        "sw a0, 4*30(sp)\n"        //store the user mode's stack pointer to the stack frame so now the whole context is saved, a0 may now hold a garbage value
+    )
+}

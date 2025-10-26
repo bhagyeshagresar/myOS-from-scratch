@@ -115,3 +115,8 @@ else // <-- ERROR: This 'else' is not attached to the previous 'if'
     printf("Success");
 
 The compiler sees the block terminated by a semicolon, making the else a separate, unmatched token, which is a syntax error known as a dangling else.
+
+
+/****** Important Note *************\
+while your host machine uses its default compiler (GCC) and C library (glibc) to run programs like your web browser, 
+the programs you write for your RISC-V emulator will be compiled by Clang and will need a separate RISC-V C library to run inside QEMU.
