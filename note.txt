@@ -1,4 +1,5 @@
-We need the ecall (Environment Call) instruction because it is the fundamental mechanism for crossing privilege boundaries in RISC-V. This is essential for the security and stability of the system, enabling two core functions: System Calls and Firmware Calls (SBI).
+We need the ecall (Environment Call) instruction because it is the fundamental mechanism for crossing privilege boundaries in RISC-V. This is essential for the security and stability of the system, 
+enabling two core functions: System Calls and Firmware Calls (SBI).
 
 Here's a breakdown of why this mechanism is necessary:
 

@@ -38,39 +38,6 @@ void putchar(char ch){
     sbi_call(ch, 0, 0, 0, 0, 0, 0, 1/* Console Putchar */);
 }
 
-
-
-void kernel_main(void){
-    // const char *s = "Hello World\n";
-    // for(int i = 0; s[i] != '\0'; i++){
-    //     putchar(s[i]);
-    // }
-    //memset(__bss, 0, (size_t)__bss_end - (size_t)__bss);
-
-    //printf("\n\nHello %s\n", "World!");
-    //printf("1 + 2 = %d, %x\n", 1+2, 0x1234abcd);
-
-    PANIC("booted!\n");
-    printf("unreachable here!\n");
-
-    //create an infinite idle loop
-    for(;;){
-        __asm__ __volatile__("wfi"); // This is the Wait For Interrupt instruction, embedded via inline assembly. It is a power-saving mechanism
-    }
-}
-
-
-__attribute__((section(".text.boot")))
-__attribute__((naked))
-void boot(void){
-    __asm__ __volatile__(
-        "mv sp, %[stack_top]\n" //set the stack pointer
-        "j kernel_main\n"       //jump to the kernel main function
-        :
-        : [stack_top] "r" (__stack_top) // Pass the stack top address as %[stack_top]
-    );
-}
-
 //Kernel exception handler. Store the address of this function in stvec register
 __attribute__((naked))
 __attribute__((aligned(4)))
@@ -111,5 +78,92 @@ void kernel_entry(void){
 
         "csrr a0, sscratch\n"      //the user mode's stack poiinter at the point of exception is stored in a0
         "sw a0, 4*30(sp)\n"        //store the user mode's stack pointer to the stack frame so now the whole context is saved, a0 may now hold a garbage value
-    )
+        
+        "mv a0, sp\n"              //move the curren address of the stack frame into a0, In the RISC-V calling convention, the first function argument must be placed in the a0 register
+        "call handle_trap\n"
+        
+        "lw ra,  4 * 0(sp)\n"       //after the handle_trap returns the kernel resumes the interrupted process, loads the trap frame back to the GPRs
+        "lw gp,  4 * 1(sp)\n"
+        "lw tp,  4 * 2(sp)\n"
+        "lw t0,  4 * 3(sp)\n"
+        "lw t1,  4 * 4(sp)\n"
+        "lw t2,  4 * 5(sp)\n"
+        "lw t3,  4 * 6(sp)\n"
+        "lw t4,  4 * 7(sp)\n"
+        "lw t5,  4 * 8(sp)\n"
+        "lw t6,  4 * 9(sp)\n"
+        "lw a0,  4 * 10(sp)\n"
+        "lw a1,  4 * 11(sp)\n"
+        "lw a2,  4 * 12(sp)\n"
+        "lw a3,  4 * 13(sp)\n"
+        "lw a4,  4 * 14(sp)\n"
+        "lw a5,  4 * 15(sp)\n"
+        "lw a6,  4 * 16(sp)\n"
+        "lw a7,  4 * 17(sp)\n"
+        "lw s0,  4 * 18(sp)\n"
+        "lw s1,  4 * 19(sp)\n"
+        "lw s2,  4 * 20(sp)\n"
+        "lw s3,  4 * 21(sp)\n"
+        "lw s4,  4 * 22(sp)\n"
+        "lw s5,  4 * 23(sp)\n"
+        "lw s6,  4 * 24(sp)\n"
+        "lw s7,  4 * 25(sp)\n"
+        "lw s8,  4 * 26(sp)\n"
+        "lw s9,  4 * 27(sp)\n"
+        "lw s10, 4 * 28(sp)\n"
+        "lw s11, 4 * 29(sp)\n"
+        "lw sp,  4 * 30(sp)\n"  
+        "sret\n"                //call the sret instruction to resume execution from the point where the exception occurred.
+        
+    );
 }
+
+//Handle the exception in C
+void handle_trap(struct trap_frame *f){
+    uint32_t scause = READ_CSR(scause);  //scause - type of exception. The kernel reads this to identify the type of exception
+    uint32_t stval = READ_CSR(stval);    //stval - Additional information about the exception (e.g., memory address that caused the exception). Depends on the type of exception.
+    uint32_t user_pc = READ_CSR(sepc);   //sepc - Program counter at the point where the exception occurred.
+
+    PANIC("unexpected trap scause=%x, stval=%x, sepc=%x\n", scause, stval, user_pc);
+}
+
+void kernel_main(void){
+    // const char *s = "Hello World\n";
+    // for(int i = 0; s[i] != '\0'; i++){
+    //     putchar(s[i]);
+    // }
+    //memset(__bss, 0, (size_t)__bss_end - (size_t)__bss);
+
+    //printf("\n\nHello %s\n", "World!");
+    //printf("1 + 2 = %d, %x\n", 1+2, 0x1234abcd);
+
+    //PANIC("booted!\n"); //from chapter 07: Kernel Panic 
+    //printf("unreachable here!\n");
+
+    memset(__bss, 0, (size_t)__bss_end - (size_t)__bss);
+    WRITE_CSR(stvec, (uint32_t)kernel_entry); //tell the CPU where the exception handler is located
+    /*
+        This reads and writes the cycle register into x0. Since cycle is a read-only register, 
+        CPU determines that the instruction is invalid and triggers an illegal instruction exception.
+    */
+    __asm__ __volatile__("unimp");            //unimp is a pseudo instruction. the assembler translates this to : csrrw x0,cycle,x0
+
+
+    //create an infinite idle loop
+    for(;;){
+        __asm__ __volatile__("wfi"); // This is the Wait For Interrupt instruction, embedded via inline assembly. It is a power-saving mechanism
+    }
+}
+
+
+__attribute__((section(".text.boot")))
+__attribute__((naked))
+void boot(void){
+    __asm__ __volatile__(
+        "mv sp, %[stack_top]\n" //set the stack pointer
+        "j kernel_main\n"       //jump to the kernel main function
+        :
+        : [stack_top] "r" (__stack_top) // Pass the stack top address as %[stack_top]
+    );
+}
+
