@@ -24,3 +24,30 @@ r constraint: This tells the compiler that the operand should be placed in a gen
 
 ## printf() function
 Handles string, signed integers and hexadecimal format
+
+
+
+## Test results for the bump allocator:
+
+void kernel_main(void) {
+    memset(__bss, 0, (size_t) __bss_end - (size_t) __bss);
+
+    paddr_t paddr0 = alloc_pages(2);
+    paddr_t paddr1 = alloc_pages(1);
+    printf("alloc_pages test: paddr0=%x\n", paddr0);
+    printf("alloc_pages test: paddr1=%x\n", paddr1);
+
+    PANIC("booted!");
+}
+
+$ ./run.sh
+alloc_pages test: paddr0=80221000
+alloc_pages test: paddr1=80223000
+PANIC: kernel.c:188: booted!
+
+
+$ llvm-nm kernel.elf | grep __free_ram 
+80221000 B __free_ram
+84221000 B __free_ram_end
+
+The symbol B means assigned to .bss section

@@ -6,9 +6,32 @@ typedef unsigned int uint32_t;
 typedef uint32_t size_t;
 
 extern char __bss[], __bss_end[], __stack_top[];
+extern char __free_ram[], __free_ram_end[];
 
+/*
+ * Function to allocate memory in pages (1 page = 4KB) dynamically. Also knows as bump allocator or linear allocator.
+ * This function does not perform deallocation of memory
+ * __free_ram is placed on a 4KB boundary due to ALIGN(4096) in the linker script. 
+ * Therefore, the alloc_pages function always returns an address aligned to 4KB.
+ */
+paddr_t alloc_pages(uint32_t n)
+{
+    //__free_ram and __free_ram_end represent the start and end addresses of the free ram
+    static paddr_t next_paddr = (paddr_t)__free_ram; //this is a static variable so its returned after function calls
+    paddr_t paddr = next_paddr;
+    next_paddr += n*PAGE_SIZE; //allocate n pages
 
+    //if it tried to allocate memory beyond __free_ram_end do a PANIC check
+    if(next_paddr > (paddr_t)__free_ram_end)
+    {
+        PANIC("ran out of memory\n");
+    }
 
+    //ensure the allocated memory is initially to zero
+    memset((void*)paddr, 0, n*PAGE_SIZE); 
+    return paddr;
+ 
+}
 
 
 struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long arg4,
@@ -140,19 +163,30 @@ void kernel_main(void){
     //PANIC("booted!\n"); //from chapter 07: Kernel Panic 
     //printf("unreachable here!\n");
 
-    memset(__bss, 0, (size_t)__bss_end - (size_t)__bss);
-    WRITE_CSR(stvec, (uint32_t)kernel_entry); //tell the CPU where the exception handler is located
-    /*
-        This reads and writes the cycle register into x0. Since cycle is a read-only register, 
-        CPU determines that the instruction is invalid and triggers an illegal instruction exception.
-    */
-    __asm__ __volatile__("unimp");            //unimp is a pseudo instruction. the assembler translates this to : csrrw x0,cycle,x0
+    // memset(__bss, 0, (size_t)__bss_end - (size_t)__bss); //because dat in bss section is initialised to zero
+    // WRITE_CSR(stvec, (uint32_t)kernel_entry); //tell the CPU where the exception handler is located
+    // /*
+    //     This reads and writes the cycle register into x0. Since cycle is a read-only register, 
+    //     CPU determines that the instruction is invalid and triggers an illegal instruction exception.
+    // */
+    // __asm__ __volatile__("unimp");            //unimp is a pseudo instruction. the assembler translates this to : csrrw x0,cycle,x0
 
 
-    //create an infinite idle loop
-    for(;;){
-        __asm__ __volatile__("wfi"); // This is the Wait For Interrupt instruction, embedded via inline assembly. It is a power-saving mechanism
-    }
+    // //create an infinite idle loop
+    // for(;;){
+    //     __asm__ __volatile__("wfi"); // This is the Wait For Interrupt instruction, embedded via inline assembly. It is a power-saving mechanism
+    // }
+
+    //Chapter 9 : Memory Allocation Testing
+    memset(__bss, 0, (size_t)__bss_end - (size_t)__bss); 
+
+    paddr_t paddr0 = alloc_pages(2);
+    paddr_t paddr1 = alloc_pages(1);
+    printf("alloc_pages test: paddr0=%x\n", paddr0);
+    printf("alloc_pages test: paddr1=%x\n", paddr1);
+
+    PANIC("booted!");
+
 }
 
 
