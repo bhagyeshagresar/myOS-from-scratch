@@ -29,11 +29,20 @@ Handles string, signed integers and hexadecimal format
 
 ## Test results for the bump allocator:
 
+### 3. Kernel Entry Point (`kernel_main`)
+
+The kernel initializes the BSS section and then allocates the first blocks of physical memory using a simple bump allocator before panicking.
+
+```c
 void kernel_main(void) {
+    // Zero out the entire BSS section
     memset(__bss, 0, (size_t) __bss_end - (size_t) __bss);
 
+    // Allocate 2 pages (8KB) and 1 page (4KB)
     paddr_t paddr0 = alloc_pages(2);
     paddr_t paddr1 = alloc_pages(1);
+    
+    // Print the addresses of the allocated physical pages
     printf("alloc_pages test: paddr0=%x\n", paddr0);
     printf("alloc_pages test: paddr1=%x\n", paddr1);
 
