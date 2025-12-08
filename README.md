@@ -115,35 +115,50 @@ and are already saved on the stack by the caller
 
 ### Testing context switch
 While testing context switching between proc_a and proc_b, I initially made the mistake of saving and restoring stacks incorrectly:
-
 Issue: switch_context(&proc_a->sp, &proc_b->sp) was called, but proc_b’s stack was never properly initialized/saved.
-
 What happened:
-
-old_sp = &proc_a->sp overwrote proc_a’s stack with the current SP (garbage).
-
-new_sp = &proc_b->sp loaded an uninitialized stack pointer.
-
-ret popped a garbage return address → CPU jumped to 0x0.
-
-Kernel panic occurred (scause=1, stval=0, sepc=0).
-
-Lesson learned: Always ensure the new process stack is properly initialized before switching, and save the old process stack correctly.
-
+    old_sp = &proc_a->sp overwrote proc_a’s stack with the current SP (garbage)
+    new_sp = &proc_b->sp loaded an uninitialized stack pointer
+    ret popped a garbage return address → CPU jumped to 0x0
+    Kernel panic occurred (scause=1, stval=0, sepc=0)
+    
+It was fun to understand what happened in the background!
 ```c
 
-    void kernel_main(void)
+void proc_a_entry(void)
+{
+    printf("Starting process A\n");
+    while(1)
     {
-        memset(__bss, 0, (size_t) __bss_end - (size_t) __bss);
-        WRITE_CSR(stvec, (uint32_t) kernel_entry);
-
-        proc_a = create_process((uint32_t) proc_a_entry);
-        proc_b = create_process((uint32_t) proc_b_entry);
-        proc_a_entry(); //start the first process and trigger context switch
-
-        PANIC("unreachable here!");
-
+        putchar('A');
+        switch_context(&proc_a->sp, &proc_b->sp);
+        delay();
     }
+}
+
+void proc_b_entry(void)
+{
+    printf("Starting process B\n");
+    while(1)
+    {
+        putchar('B');
+        switch_context(&proc_b->sp, &proc_a->sp);
+        delay();
+    }
+}
+
+void kernel_main(void)
+{
+    memset(__bss, 0, (size_t) __bss_end - (size_t) __bss);
+    WRITE_CSR(stvec, (uint32_t) kernel_entry);
+
+    proc_a = create_process((uint32_t) proc_a_entry);
+    proc_b = create_process((uint32_t) proc_b_entry);
+    proc_a_entry(); //start the first process and trigger context switch
+
+    PANIC("unreachable here!");
+
+}
 
 Output: 
 Starting process A
