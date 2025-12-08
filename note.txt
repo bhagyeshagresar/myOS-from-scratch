@@ -121,3 +121,45 @@ The compiler sees the block terminated by a semicolon, making the else a separat
 /****** Important Note *************\
 while your host machine uses its default compiler (GCC) and C library (glibc) to run programs like your web browser, 
 the programs you write for your RISC-V emulator will be compiled by Clang and will need a separate RISC-V C library to run inside QEMU.
+
+
+
+//Context switch test bug 
+
+Starting process A AStarting process B BPANIC: kernel.c:290: unexpected trap scause=00000001, stval=00000000, sepc=00000000
+
+Step by step:
+
+    old_sp = &proc_a->sp → saves proc_b’s registers (current SP) into proc_a->sp
+
+    proc_a stack is overwritten
+
+    proc_b stack is not saved
+
+    new_sp = &proc_b->sp → loads proc_b->sp (not saved yet properly)
+
+    ret pops ra from proc_b stack → garbage, usually 0
+
+    CPU jumps to 0x0 → trap occurs (scause=1, stval=0, sepc=0)
+
+    This explains why your original code crashed at the first proc_b switch.
+{
+    printf("Starting process A\n");
+    while(1)
+    {
+        putchar('A');
+        switch_context(&proc_a->sp, &proc_b->sp);
+        delay();
+    }
+}
+
+void proc_b_entry(void)
+{
+    printf("Starting process B\n");
+    while(1)
+    {
+        putchar('B');
+       switch_context(&proc_a->sp, &proc_b->sp); //this caused the error
+        delay();
+    }
+}

@@ -38,9 +38,31 @@ M-mode -> OpenSBI (BIOS) operates in this mode
 S-mode -> kernel mode
 U-mode -> user mode (applicaton)
 
+## Excepion Handling
+PANIC: kernel.c:291: unexpected trap scause=00000002, stval=00000000, sepc=80200370
+value of scause = 2 means illegal instruction
+```c
 
-## Test results for the bump allocator:
+const char *s = "Hello World\n";
+    for(int i = 0; s[i] != '\0'; i++){
+        putchar(s[i]);
+    }
+    
+     memset(__bss, 0, (size_t)__bss_end - (size_t)__bss); //because dat in bss section is initialised to zero
+     WRITE_CSR(stvec, (uint32_t)kernel_entry); //tell the CPU where the exception handler is located
+    /*
+        This reads and writes the cycle register into x0. Since cycle is a read-only register, 
+        CPU determines that the instruction is invalid and triggers an illegal instruction exception.
+    */
+    __asm__ __volatile__("unimp");            //unimp is a pseudo instruction. the assembler translates this to : csrrw x0,cycle,x0
 
+llvm-addr2line -e kernel.elf 80200370
+/home/bhagyesh/myOS_project/kernel.c:313    //confirmed that this line matches with unimp instruction in kernel.c
+```
+
+## Creating a simple memory allocator(bump allocator)
+
+### Testing our simple memory allocator
 The kernel initializes the BSS section and then allocates the first blocks of physical memory using a simple bump allocator before panicking.
 
 ```c
@@ -73,7 +95,9 @@ The symbol B means assigned to .bss section
 
 ```
 
-## Process Control Block
+## Creation of multiple processes
+
+### Process Control Block
 
 ```c
 // Define a process object, also known as a Process Control Block (PCB)
@@ -87,3 +111,43 @@ struct process {
 callee-saved registers - must be restored by the called function before returning.
 In RISC-V, s0 - s11 are callee-saved registers. a0 and a1 are caller-saved registers
 and are already saved on the stack by the caller
+
+
+### Testing context switch
+While testing context switching between proc_a and proc_b, I initially made the mistake of saving and restoring stacks incorrectly:
+
+Issue: switch_context(&proc_a->sp, &proc_b->sp) was called, but proc_b’s stack was never properly initialized/saved.
+
+What happened:
+
+old_sp = &proc_a->sp overwrote proc_a’s stack with the current SP (garbage).
+
+new_sp = &proc_b->sp loaded an uninitialized stack pointer.
+
+ret popped a garbage return address → CPU jumped to 0x0.
+
+Kernel panic occurred (scause=1, stval=0, sepc=0).
+
+Lesson learned: Always ensure the new process stack is properly initialized before switching, and save the old process stack correctly.
+
+```c
+
+    void kernel_main(void)
+    {
+        memset(__bss, 0, (size_t) __bss_end - (size_t) __bss);
+        WRITE_CSR(stvec, (uint32_t) kernel_entry);
+
+        proc_a = create_process((uint32_t) proc_a_entry);
+        proc_b = create_process((uint32_t) proc_b_entry);
+        proc_a_entry(); //start the first process and trigger context switch
+
+        PANIC("unreachable here!");
+
+    }
+
+Output: 
+Starting process A
+AStarting process B
+BABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB
+
+```

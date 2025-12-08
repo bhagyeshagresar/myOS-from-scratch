@@ -11,34 +11,39 @@ struct process procs[PROCS_MAX]; // All process control structures.
 struct process *proc_a;
 struct process *proc_b;
 
+
+struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long arg4,
+    long arg5, long fid, long eid){
+register long a0 __asm__("a0") = arg0; 
+register long a1 __asm__("a1") = arg1;
+register long a2 __asm__("a2") = arg2;
+register long a3 __asm__("a3") = arg3;
+register long a4 __asm__("a4") = arg4;
+register long a5 __asm__("a5") = arg5;
+register long a6 __asm__("a6") = fid;
+register long a7 __asm__("a7") = eid;
+    
+//according to SBI specification, a0 and a7 
+//a0 and a1 are with =r constraint because a0 and a1 are output operands(registers)      
+__asm__ __volatile__("ecall"
+        : "=r"(a0), "=r"(a1)
+        : "r"(a0), "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5),
+        "r"(a6), "r"(a7)
+        : "memory");
+
+return (struct sbiret){.error = a0, .value = a1}; /*according to SBI specifications, the ecall returns a pair of values in a0 and a1, a0 returning an error code*/
+}
+
+
+void putchar(char ch){
+sbi_call(ch, 0, 0, 0, 0, 0, 0, 1/* Console Putchar */);
+}
+
 //delay function implements a busy wait to prevent the character output from becoming too fast, which would make your terminal unresponsive
 void delay(void) {
     for (int i = 0; i < 30000000; i++)
         __asm__ __volatile__("nop"); // do nothing
 }
-
-void proc_a_entry(void)
-{
-    printf("Starting process A\n");
-    while(1)
-    {
-        putchar('A');
-        switch_context(&proc_a->sp, &proc_b->sp);
-        delay();
-    }
-}
-
-void proc_b_entry(void)
-{
-    printf("Starting process B\n");
-    while(1)
-    {
-        putchar('B');
-        switch_context(&proc_a->sp, &proc_b->sp);
-        delay();
-    }
-}
-
 
 /*note : The naked attribute tells the compiler not to generate any other code than the inline assembly */
 // callee-saved registers - must be restored by the called function before returning.
@@ -85,16 +90,16 @@ __attribute__((naked)) void switch_context(uint32_t *prev_sp, uint32_t *next_sp)
          "addi sp, sp, 13*4\n" //pop 13 4byte registers from the stack
          "ret\n"
          
-    )
+    );
 }
 
-//process initialisation function
 /*
- parameters:
-    uint32_t pc : entry point
+    Process initialisation function
+    parameters:
+        uint32_t pc : entry point
 
- returns:
-    struct process *proc: pointer to the created process's struct
+    returns:
+        struct process *proc: pointer to the created process's struct
 */
 struct process *create_process(uint32_t pc)
 {
@@ -172,32 +177,29 @@ paddr_t alloc_pages(uint32_t n)
 }
 
 
-struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long arg4,
-                        long arg5, long fid, long eid){
-        register long a0 __asm__("a0") = arg0; 
-        register long a1 __asm__("a1") = arg1;
-        register long a2 __asm__("a2") = arg2;
-        register long a3 __asm__("a3") = arg3;
-        register long a4 __asm__("a4") = arg4;
-        register long a5 __asm__("a5") = arg5;
-        register long a6 __asm__("a6") = fid;
-        register long a7 __asm__("a7") = eid;
-                        
-      //according to SBI specification, a0 and a7 
-      //a0 and a1 are with =r constraint because a0 and a1 are output operands(registers)      
-        __asm__ __volatile__("ecall"
-                            : "=r"(a0), "=r"(a1)
-                            : "r"(a0), "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5),
-                            "r"(a6), "r"(a7)
-                            : "memory");
-        
-        return (struct sbiret){.error = a0, .value = a1}; /*according to SBI specifications, the ecall returns a pair of values in a0 and a1, a0 returning an error code*/
+void proc_a_entry(void)
+{
+    printf("Starting process A\n");
+    while(1)
+    {
+        putchar('A');
+        switch_context(&proc_a->sp, &proc_b->sp);
+        delay();
+    }
+}
+
+void proc_b_entry(void)
+{
+    printf("Starting process B\n");
+    while(1)
+    {
+        putchar('B');
+        switch_context(&proc_b->sp, &proc_a->sp);
+        delay();
+    }
 }
 
 
-void putchar(char ch){
-    sbi_call(ch, 0, 0, 0, 0, 0, 0, 1/* Console Putchar */);
-}
 
 //Kernel exception handler. Store the address of this function in stvec register
 __attribute__((naked))
@@ -281,6 +283,7 @@ void kernel_entry(void){
 
 //Handle the exception in C
 void handle_trap(struct trap_frame *f){
+    (void)f; // suppress unused parameter warning
     uint32_t scause = READ_CSR(scause);  //scause - type of exception. The kernel reads this to identify the type of exception
     uint32_t stval = READ_CSR(stval);    //stval - Additional information about the exception (e.g., memory address that caused the exception). Depends on the type of exception.
     uint32_t user_pc = READ_CSR(sepc);   //sepc - Program counter at the point where the exception occurred.
@@ -301,8 +304,8 @@ void kernel_main(void){
     //PANIC("booted!\n"); //from chapter 07: Kernel Panic 
     //printf("unreachable here!\n");
 
-    // memset(__bss, 0, (size_t)__bss_end - (size_t)__bss); //because dat in bss section is initialised to zero
-    // WRITE_CSR(stvec, (uint32_t)kernel_entry); //tell the CPU where the exception handler is located
+    //  memset(__bss, 0, (size_t)__bss_end - (size_t)__bss); //because dat in bss section is initialised to zero
+    //  WRITE_CSR(stvec, (uint32_t)kernel_entry); //tell the CPU where the exception handler is located
     // /*
     //     This reads and writes the cycle register into x0. Since cycle is a read-only register, 
     //     CPU determines that the instruction is invalid and triggers an illegal instruction exception.
@@ -335,7 +338,7 @@ void kernel_main(void){
 
     proc_a = create_process((uint32_t) proc_a_entry);
     proc_b = create_process((uint32_t) proc_b_entry);
-    proc_a_entry();
+    proc_a_entry(); //start the first process and trigger context switch
 
     PANIC("unreachable here!");
 

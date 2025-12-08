@@ -52,8 +52,8 @@ struct process
     int pid;                // Process ID
     int state;              // Process state: PROC_UNUSED or PROC_RUNNABLE
     vaddr_t sp;             // Stack Pointer
-    uint8_t stack[8192];    // Kernel Stack
-}
+    uint8_t stack[8192];    // Kernel Stack (8KB size)
+};
 
 
 /*
