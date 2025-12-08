@@ -71,9 +71,11 @@ $ llvm-nm kernel.elf | grep __free_ram
 
 The symbol B means assigned to .bss section
 
+```
 
 ## Process Control Block
 
+```c
 // Define a process object, also known as a Process Control Block (PCB)
 struct process {
     int pid;                // Process ID
@@ -81,6 +83,7 @@ struct process {
     vaddr_t sp;             // Stack Pointer
     uint8_t stack[8192];    // Kernel Stack
 };
+```
 callee-saved registers - must be restored by the called function before returning.
 In RISC-V, s0 - s11 are callee-saved registers. a0 and a1 are caller-saved registers
 and are already saved on the stack by the caller
