@@ -11,6 +11,13 @@ In addition to building my own OS, the aim of the project is to implement the fo
 
 This project is implemented on Ubuntu 24.04
 
+
+## Project Structure 
+
+
+
+
+
 ## Tools used:
 
 1) QEMU Virtual Machine to emulate the hardware
@@ -60,3 +67,21 @@ $ llvm-nm kernel.elf | grep __free_ram
 84221000 B __free_ram_end
 
 The symbol B means assigned to .bss section
+
+
+## Process Control Block
+
+```c
+//define a process object, also known as a Process Control Block(PCB)
+struct process
+{
+    int pid;                // Process ID
+    int state;              // Process state: PROC_UNUSED or PROC_RUNNABLE
+    vaddr_t sp;             // Stack Pointer
+    uint8_t stack[8192];    // Kernel Stack
+}
+
+```c
+callee-saved registers - must be restored by the called function before returning.
+In RISC-V, s0 - s11 are callee-saved registers. a0 and a1 are caller-saved registers
+and are already saved on the stack by the caller

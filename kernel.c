@@ -7,6 +7,112 @@ typedef uint32_t size_t;
 
 extern char __bss[], __bss_end[], __stack_top[];
 extern char __free_ram[], __free_ram_end[];
+struct process procs[PROCS_MAX]; // All process control structures.
+
+//process initialisation function
+/*
+ parameters:
+    uint32_t pc : entry point
+*/
+struct process *create_process(uint32_t pc)
+{
+    //find an unused process control strucuture
+    struct process *proc = NULL;
+    int i;
+    for(i = 0; i < PROCS_MAX; i++)
+    {
+        if(procs[i].state == PROC_UNUSED)
+        {
+            proc = &procs[i];
+            break;
+        }
+    }
+
+    if(!proc)
+    {
+        PANIC("no free process slots available\n");
+    }
+
+    // Stack callee-saved registers. These register values will be restored in
+    // the first context switch in switch_context.
+    // the stack pointer is initialized to the memory address just beyond the end of the allocated stack buffer (proc->stack).
+    // sizeof(proc->stack): This returns the size of the entire stack array in bytes (e.g., 8192).
+    // *--sp = 0; this is equivalent to pushing on the stack. the decrement operator is executed before the * operator
+    // if we do *sp--, the post decrement operator is executed after the dereference operator
+    uint32_t *sp = (uint32_t*) &proc->stack[sizeof(proc->stack)];
+    *--sp = 0;                      // s11
+    *--sp = 0;                      // s10
+    *--sp = 0;                      // s9
+    *--sp = 0;                      // s8
+    *--sp = 0;                      // s7
+    *--sp = 0;                      // s6
+    *--sp = 0;                      // s5
+    *--sp = 0;                      // s4
+    *--sp = 0;                      // s3
+    *--sp = 0;                      // s2
+    *--sp = 0;                      // s1
+    *--sp = 0;                      // s0
+    *--sp = (uint32_t) pc;          // ra
+
+    //update the process control block for this process
+    proc->pid = i + 1;
+    proc->state = PROC_RUNNABLE;
+    proc->sp = (uint32_t) sp;
+    return proc;
+
+
+}
+
+
+/*note : The naked attribute tells the compiler not to generate any other code than the inline assembly */
+// callee-saved registers - must be restored by the called function before returning.
+// In RISC-V, s0 - s11 are callee-saved registers. a0 and a1 are caller-saved registers
+// and are already saved on the stack by the caller
+__attribute__((naked)) void switch_context(uint32_t *prev_sp, uint32_t *next_sp)
+{
+
+    __asm__ __volatile__(
+         // Save callee-saved registers onto the current process's stack.
+         "addi sp, sp, -13*4\n" // Allocate stack space for 13 4-byte registers
+         "sw ra, 0*4(sp)\n"
+         "sw s0, 1*4(sp)\n"
+         "sw s1, 2*4(sp)\n"
+         "sw s2, 3*4(sp)\n"
+         "sw s3, 4*4(sp)\n"
+         "sw s4, 5*4(sp)\n"
+         "sw s5, 6*4(sp)\n"
+         "sw s6, 7*4(sp)\n"
+         "sw s7, 8*4(sp)\n"
+         "sw s8, 9*4(sp)\n"
+         "sw s9, 10*4(sp)\n"
+         "sw s10, 11*4(sp)\n"
+         "sw s11, 12*4(sp)\n"
+
+         //switch the stack pointer to point to the next process stack
+         "sw sp, (a0)\n"    // store *prev_sp = sp;
+         "lw sp, (a1)\n"    // load sp = *next_sp;
+
+          // Restore callee-saved registers from the next process's stack.
+         "lw ra, 0*4(sp)\n"
+         "lw s0, 1*4(sp)\n"
+         "lw s1, 2*4(sp)\n"
+         "lw s2, 3*4(sp)\n"
+         "lw s3, 4*4(sp)\n"
+         "lw s4, 5*4(sp)\n"
+         "lw s5, 6*4(sp)\n"
+         "lw s6, 7*4(sp)\n"
+         "lw s7, 8*4(sp)\n"
+         "lw s8, 9*4(sp)\n"
+         "lw s9, 10*4(sp)\n"
+         "lw s10, 11*4(sp)\n"
+         "lw s11, 12*4(sp)\n"
+         "addi sp, sp, 13*4\n" //pop 13 4byte registers from the stack
+         "ret\n"
+         
+    )
+}
+
+
 
 /*
  * Function to allocate memory in pages (1 page = 4KB) dynamically. Also knows as bump allocator or linear allocator.
