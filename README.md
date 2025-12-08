@@ -39,13 +39,6 @@ S-mode -> kernel mode
 U-mode -> user mode (applicaton)
 
 
-
-
-## printf() function
-Handles string, signed integers and hexadecimal format
-
-## Exception Handler
-
 ## Test results for the bump allocator:
 
 The kernel initializes the BSS section and then allocates the first blocks of physical memory using a simple bump allocator before panicking.
@@ -81,17 +74,13 @@ The symbol B means assigned to .bss section
 
 ## Process Control Block
 
-```c
-//define a process object, also known as a Process Control Block(PCB)
-struct process
-{
+// Define a process object, also known as a Process Control Block (PCB)
+struct process {
     int pid;                // Process ID
     int state;              // Process state: PROC_UNUSED or PROC_RUNNABLE
     vaddr_t sp;             // Stack Pointer
     uint8_t stack[8192];    // Kernel Stack
-}
-
-```c
+};
 callee-saved registers - must be restored by the called function before returning.
 In RISC-V, s0 - s11 are callee-saved registers. a0 and a1 are caller-saved registers
 and are already saved on the stack by the caller
