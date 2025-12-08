@@ -8,59 +8,35 @@ typedef uint32_t size_t;
 extern char __bss[], __bss_end[], __stack_top[];
 extern char __free_ram[], __free_ram_end[];
 struct process procs[PROCS_MAX]; // All process control structures.
+struct process *proc_a;
+struct process *proc_b;
 
-//process initialisation function
-/*
- parameters:
-    uint32_t pc : entry point
-*/
-struct process *create_process(uint32_t pc)
+//delay function implements a busy wait to prevent the character output from becoming too fast, which would make your terminal unresponsive
+void delay(void) {
+    for (int i = 0; i < 30000000; i++)
+        __asm__ __volatile__("nop"); // do nothing
+}
+
+void proc_a_entry(void)
 {
-    //find an unused process control strucuture
-    struct process *proc = NULL;
-    int i;
-    for(i = 0; i < PROCS_MAX; i++)
+    printf("Starting process A\n");
+    while(1)
     {
-        if(procs[i].state == PROC_UNUSED)
-        {
-            proc = &procs[i];
-            break;
-        }
+        putchar('A');
+        switch_context(&proc_a->sp, &proc_b->sp);
+        delay();
     }
+}
 
-    if(!proc)
+void proc_b_entry(void)
+{
+    printf("Starting process B\n");
+    while(1)
     {
-        PANIC("no free process slots available\n");
+        putchar('B');
+        switch_context(&proc_a->sp, &proc_b->sp);
+        delay();
     }
-
-    // Stack callee-saved registers. These register values will be restored in
-    // the first context switch in switch_context.
-    // the stack pointer is initialized to the memory address just beyond the end of the allocated stack buffer (proc->stack).
-    // sizeof(proc->stack): This returns the size of the entire stack array in bytes (e.g., 8192).
-    // *--sp = 0; this is equivalent to pushing on the stack. the decrement operator is executed before the * operator
-    // if we do *sp--, the post decrement operator is executed after the dereference operator
-    uint32_t *sp = (uint32_t*) &proc->stack[sizeof(proc->stack)];
-    *--sp = 0;                      // s11
-    *--sp = 0;                      // s10
-    *--sp = 0;                      // s9
-    *--sp = 0;                      // s8
-    *--sp = 0;                      // s7
-    *--sp = 0;                      // s6
-    *--sp = 0;                      // s5
-    *--sp = 0;                      // s4
-    *--sp = 0;                      // s3
-    *--sp = 0;                      // s2
-    *--sp = 0;                      // s1
-    *--sp = 0;                      // s0
-    *--sp = (uint32_t) pc;          // ra
-
-    //update the process control block for this process
-    proc->pid = i + 1;
-    proc->state = PROC_RUNNABLE;
-    proc->sp = (uint32_t) sp;
-    return proc;
-
-
 }
 
 
@@ -112,6 +88,62 @@ __attribute__((naked)) void switch_context(uint32_t *prev_sp, uint32_t *next_sp)
     )
 }
 
+//process initialisation function
+/*
+ parameters:
+    uint32_t pc : entry point
+
+ returns:
+    struct process *proc: pointer to the created process's struct
+*/
+struct process *create_process(uint32_t pc)
+{
+    //find an unused process control strucuture
+    struct process *proc = NULL;
+    int i;
+    for(i = 0; i < PROCS_MAX; i++)
+    {
+        if(procs[i].state == PROC_UNUSED)
+        {
+            proc = &procs[i];
+            break;
+        }
+    }
+
+    if(!proc)
+    {
+        PANIC("no free process slots available\n");
+    }
+
+    // Stack callee-saved registers. These register values will be restored in
+    // the first context switch in switch_context.
+    // the stack pointer is initialized to the memory address just beyond the end of the allocated stack buffer (proc->stack).
+    // sizeof(proc->stack): This returns the size of the entire stack array in bytes (e.g., 8192).
+    // *--sp = 0; this is equivalent to pushing on the stack. the decrement operator is executed before the * operator
+    // if we do *sp--, the post decrement operator is executed after the dereference operator
+    uint32_t *sp = (uint32_t*) &proc->stack[sizeof(proc->stack)];
+    *--sp = 0;                      // s11
+    *--sp = 0;                      // s10
+    *--sp = 0;                      // s9
+    *--sp = 0;                      // s8
+    *--sp = 0;                      // s7
+    *--sp = 0;                      // s6
+    *--sp = 0;                      // s5
+    *--sp = 0;                      // s4
+    *--sp = 0;                      // s3
+    *--sp = 0;                      // s2
+    *--sp = 0;                      // s1
+    *--sp = 0;                      // s0
+    *--sp = (uint32_t) pc;          // ra
+
+    //update the process control block for this process
+    proc->pid = i + 1;
+    proc->state = PROC_RUNNABLE;
+    proc->sp = (uint32_t) sp;
+    return proc;
+
+
+}
 
 
 /*
@@ -284,18 +316,33 @@ void kernel_main(void){
     // }
 
     //Chapter 9 : Memory Allocation Testing
-    memset(__bss, 0, (size_t)__bss_end - (size_t)__bss); 
+    /*
+    
+        memset(__bss, 0, (size_t)__bss_end - (size_t)__bss); 
 
-    paddr_t paddr0 = alloc_pages(2);
-    paddr_t paddr1 = alloc_pages(1);
-    printf("alloc_pages test: paddr0=%x\n", paddr0);
-    printf("alloc_pages test: paddr1=%x\n", paddr1);
+        paddr_t paddr0 = alloc_pages(2);
+        paddr_t paddr1 = alloc_pages(1);
+        printf("alloc_pages test: paddr0=%x\n", paddr0);
+        printf("alloc_pages test: paddr1=%x\n", paddr1);
 
-    PANIC("booted!");
+        PANIC("booted!");
+    
+    */
+    
+    //chapter 10: test for creation of two processes
+    memset(__bss, 0, (size_t) __bss_end - (size_t) __bss);
+    WRITE_CSR(stvec, (uint32_t) kernel_entry);
+
+    proc_a = create_process((uint32_t) proc_a_entry);
+    proc_b = create_process((uint32_t) proc_b_entry);
+    proc_a_entry();
+
+    PANIC("unreachable here!");
+
 
 }
 
-
+// The entry of the kernel is the boot function
 __attribute__((section(".text.boot")))
 __attribute__((naked))
 void boot(void){

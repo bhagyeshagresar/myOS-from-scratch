@@ -1,7 +1,9 @@
 #pragma once
 #include "common.h"
 
-
+#define PROCS_MAX           8         // Max number of processes
+#define PROC_UNUSED         0         // Unused process control strucuture
+#define PROC_RUNNABLE       1         // runnable process
 
 struct sbiret{
     long error;
@@ -43,6 +45,17 @@ struct trap_frame {
     uint32_t sp;
 } __attribute__((packed));
 
+
+//define a process object, also known as a Process Control Block(PCB)
+struct process
+{
+    int pid;                // Process ID
+    int state;              // Process state: PROC_UNUSED or PROC_RUNNABLE
+    vaddr_t sp;             // Stack Pointer
+    uint8_t stack[8192];    // Kernel Stack
+}
+
+
 /*
     __FILE__ and __LINE__ are standard C predefined macros and are handled by the C preprocessor phase of compilation
     __VA_ARGS__ is a special identifier that is expanded by the C preprocessor to become all the arguments that are passed to the macro after the last named argument.
@@ -77,16 +90,4 @@ struct trap_frame {
 
 
 
-#define PROCS_MAX           8         // Max number of processes
-#define PROC_UNUSED         0         // Unused process control strucuture
-#define PROC_RUNNABLE       1         // runnable process
 
-
-//define a process object, also known as a Process Control Block(PCB)
-struct process
-{
-    int pid;                // Process ID
-    int state;              // Process state: PROC_UNUSED or PROC_RUNNABLE
-    vaddr_t sp;             // Stack Pointer
-    uint8_t stack[8192];    // Kernel Stack
-}

@@ -29,14 +29,24 @@ This project is implemented on Ubuntu 24.04
 = modifier: This specifies that the operand is write-only. The compiler is informed that the inline assembly code will overwrite the contents of the registers without needing to read their previous values.
 r constraint: This tells the compiler that the operand should be placed in a general-purpose register. The compiler is free to choose any available general-purpose register to fulfill this requirement.
 
+
+## RISC-V Fundamentals
+
+### RISC-V CPU modes
+Each CPU mode has different privileges
+M-mode -> OpenSBI (BIOS) operates in this mode
+S-mode -> kernel mode
+U-mode -> user mode (applicaton)
+
+
+
+
 ## printf() function
 Handles string, signed integers and hexadecimal format
 
-
+## Exception Handler
 
 ## Test results for the bump allocator:
-
-### 3. Kernel Entry Point (`kernel_main`)
 
 The kernel initializes the BSS section and then allocates the first blocks of physical memory using a simple bump allocator before panicking.
 
