@@ -126,8 +126,8 @@ struct process *create_process(uint32_t pc)
     // the first context switch in switch_context.
     // the stack pointer is initialized to the memory address just beyond the end of the allocated stack buffer (proc->stack).
     // sizeof(proc->stack): This returns the size of the entire stack array in bytes (e.g., 8192).
-    // *--sp = 0; this is equivalent to pushing on the stack. the decrement operator is executed before the * operator
-    // if we do *sp--, the post decrement operator is executed after the dereference operator
+    // *--sp = 0; this is equivalent to pushing on the stack. sp is decremented first and then the value is stored using the deference
+    // if we do *sp--, then the value is stored using the deference operator and then the pointer is decremented
     uint32_t *sp = (uint32_t*) &proc->stack[sizeof(proc->stack)];
     *--sp = 0;                      // s11
     *--sp = 0;                      // s10
@@ -201,6 +201,14 @@ void yield(void)
         return;
     }
 
+    //store a pointer to the bottom of the kernel stack(in stacks, the bottom is the highest memory address)
+    //when allocating registers on the stack, the stack pointer always starts at an element one above so sizeof(next->stack) 
+    __asm__ __volatile__(
+        "csrw sscratch, %[sscratch]\n"
+        :
+        : [sscratch] "r" ((uint32_t) &next->stack[sizeof(next->stack)])
+    );
+
      // Context switch
      struct process *prev = current_proc;
      current_proc = next;
@@ -242,7 +250,11 @@ __attribute__((naked))
 __attribute__((aligned(4)))
 void kernel_entry(void){
     __asm__ __volatile(
-        "csrw sscratch, sp\n"       //temporarily save user mode stack pointer at the time of exception occurrence
+
+        
+        "csrrw sp, sscratch, sp\n"      // Retrieve the kernel stack of the running process from sscratch. sp now points to kernel stack and not user stack
+                                        //sscratch holds the oiginal value of sp from the user stack
+        //"csrw sscratch, sp\n"       //temporarily save user mode stack pointer at the time of exception occurrence
         "addi sp, sp, -4*31\n"      //move the stack pointer down by 4x31 = 124 bytes(allocation)
         "sw ra, 4*0(sp)\n"          //store the value of ra at an offset of 0bytes from the address held in sp. do the same for all the
         "sw gp,  4 * 1(sp)\n"       //these are the general purpose registers of the interrupted task and are stored in the newly created
@@ -278,6 +290,9 @@ void kernel_entry(void){
         "csrr a0, sscratch\n"      //the user mode's stack poiinter at the point of exception is stored in a0
         "sw a0, 4*30(sp)\n"        //store the user mode's stack pointer to the stack frame so now the whole context is saved, a0 may now hold a garbage value
         
+        "addi a0, sp, 4 * 31\n"   //reset the kernel stack
+        "csrw sscratch, a0\n"       //restore the stack pointer value(sscratch had the user stack pointer)
+
         "mv a0, sp\n"              //move the curren address of the stack frame into a0, In the RISC-V calling convention, the first function argument must be placed in the a0 register
         "call handle_trap\n"
         
@@ -328,55 +343,7 @@ void handle_trap(struct trap_frame *f){
 }
 
 void kernel_main(void){
-    // const char *s = "Hello World\n";
-    // for(int i = 0; s[i] != '\0'; i++){
-    //     putchar(s[i]);
-    // }
-    //memset(__bss, 0, (size_t)__bss_end - (size_t)__bss);
-
-    //printf("\n\nHello %s\n", "World!");
-    //printf("1 + 2 = %d, %x\n", 1+2, 0x1234abcd);
-
-    //PANIC("booted!\n"); //from chapter 07: Kernel Panic 
-    //printf("unreachable here!\n");
-
-    //  memset(__bss, 0, (size_t)__bss_end - (size_t)__bss); //because dat in bss section is initialised to zero
-    //  WRITE_CSR(stvec, (uint32_t)kernel_entry); //tell the CPU where the exception handler is located
-    // /*
-    //     This reads and writes the cycle register into x0. Since cycle is a read-only register, 
-    //     CPU determines that the instruction is invalid and triggers an illegal instruction exception.
-    // */
-    // __asm__ __volatile__("unimp");            //unimp is a pseudo instruction. the assembler translates this to : csrrw x0,cycle,x0
-
-
-    // //create an infinite idle loop
-    // for(;;){
-    //     __asm__ __volatile__("wfi"); // This is the Wait For Interrupt instruction, embedded via inline assembly. It is a power-saving mechanism
-    // }
-
-    //Chapter 9 : Memory Allocation Testing
-    /*
     
-        memset(__bss, 0, (size_t)__bss_end - (size_t)__bss); 
-
-        paddr_t paddr0 = alloc_pages(2);
-        paddr_t paddr1 = alloc_pages(1);
-        printf("alloc_pages test: paddr0=%x\n", paddr0);
-        printf("alloc_pages test: paddr1=%x\n", paddr1);
-
-        PANIC("booted!");
-    
-    */
-    
-    //chapter 10: test for creation of two processes
-    // memset(__bss, 0, (size_t) __bss_end - (size_t) __bss);
-    // WRITE_CSR(stvec, (uint32_t) kernel_entry);
-
-    // proc_a = create_process((uint32_t) proc_a_entry);
-    // proc_b = create_process((uint32_t) proc_b_entry);
-    // proc_a_entry(); //start the first process and trigger context switch
-
-    // PANIC("unreachable here!");
     memset(__bss, 0, (size_t) __bss_end - (size_t) __bss);
 
     printf("\n\n");

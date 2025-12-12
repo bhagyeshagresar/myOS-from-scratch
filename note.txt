@@ -163,3 +163,54 @@ void proc_b_entry(void)
         delay();
     }
 }
+
+// old code for kernel_main
+ // const char *s = "Hello World\n";
+    // for(int i = 0; s[i] != '\0'; i++){
+    //     putchar(s[i]);
+    // }
+    //memset(__bss, 0, (size_t)__bss_end - (size_t)__bss);
+
+    //printf("\n\nHello %s\n", "World!");
+    //printf("1 + 2 = %d, %x\n", 1+2, 0x1234abcd);
+
+    //PANIC("booted!\n"); //from chapter 07: Kernel Panic 
+    //printf("unreachable here!\n");
+
+    //  memset(__bss, 0, (size_t)__bss_end - (size_t)__bss); //because dat in bss section is initialised to zero
+    //  WRITE_CSR(stvec, (uint32_t)kernel_entry); //tell the CPU where the exception handler is located
+    // /*
+    //     This reads and writes the cycle register into x0. Since cycle is a read-only register, 
+    //     CPU determines that the instruction is invalid and triggers an illegal instruction exception.
+    // */
+    // __asm__ __volatile__("unimp");            //unimp is a pseudo instruction. the assembler translates this to : csrrw x0,cycle,x0
+
+
+    // //create an infinite idle loop
+    // for(;;){
+    //     __asm__ __volatile__("wfi"); // This is the Wait For Interrupt instruction, embedded via inline assembly. It is a power-saving mechanism
+    // }
+
+    //Chapter 9 : Memory Allocation Testing
+    /*
+    
+        memset(__bss, 0, (size_t)__bss_end - (size_t)__bss); 
+
+        paddr_t paddr0 = alloc_pages(2);
+        paddr_t paddr1 = alloc_pages(1);
+        printf("alloc_pages test: paddr0=%x\n", paddr0);
+        printf("alloc_pages test: paddr1=%x\n", paddr1);
+
+        PANIC("booted!");
+    
+    */
+    
+    //chapter 10: test for creation of two processes
+    // memset(__bss, 0, (size_t) __bss_end - (size_t) __bss);
+    // WRITE_CSR(stvec, (uint32_t) kernel_entry);
+
+    // proc_a = create_process((uint32_t) proc_a_entry);
+    // proc_b = create_process((uint32_t) proc_b_entry);
+    // proc_a_entry(); //start the first process and trigger context switch
+
+    // PANIC("unreachable here!");

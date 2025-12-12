@@ -114,14 +114,16 @@ and are already saved on the stack by the caller
 
 
 ### Testing context switch
-While testing context switching between proc_a and proc_b, I initially made the mistake of saving and restoring stacks incorrectly:
-Issue: switch_context(&proc_a->sp, &proc_b->sp) was called, but proc_b’s stack was never properly initialized/saved.
-What happened:
-    old_sp = &proc_a->sp overwrote proc_a’s stack with the current SP (garbage)
-    new_sp = &proc_b->sp loaded an uninitialized stack pointer
-    ret popped a garbage return address → CPU jumped to 0x0
-    Kernel panic occurred (scause=1, stval=0, sepc=0)
-    
+While testing context switching between `proc_a` and `proc_b`, I initially made the mistake of saving and restoring stacks incorrectly:
+
+**Issue:** `switch_context(&proc_a->sp, &proc_b->sp)` was called, but `proc_b`’s stack was never properly initialized/saved.
+
+**What happened:**
+* `old_sp = &proc_a->sp` overwrote `proc_a`’s stack with the current SP (garbage)
+* `new_sp = &proc_b->sp` loaded an uninitialized stack pointer
+* `ret` popped a garbage return address $\to$ CPU jumped to `0x0`
+* Kernel panic occurred (`scause=1`, `stval=0`, `sepc=0`)
+
 It was fun to understand what happened in the background!
 ```c
 
