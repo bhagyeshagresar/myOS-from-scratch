@@ -211,12 +211,12 @@ void* sbrk(uint32_t n)
 }
 
 // If we don't find a free space we request space from the OS using sbrk and add our new block to the end of the linked list
-block_meta *request_space(page_meta *last, uint32_t n)
+page_meta *request_space(page_meta *last, uint32_t n)
 {
-    page_meta *current_page;
-    current_page = sbrk(0); //get the current pointer
-    void* request = sbrk(n); //move the current poitner by n pages
-    assert((void*)current_page == request);
+    page_meta *current_block; //create a pointer to the reqeuested space
+    current_block = sbrk(0); //set the current pointer
+    void* request = sbrk(n); //call sbrk() to allocate n pages
+    assert((void*)current_block == request);
     if(request == (void*)-1)
     {
         return NULL; //sbrk failed
@@ -226,18 +226,20 @@ block_meta *request_space(page_meta *last, uint32_t n)
     //last will be NULL when allocating on the heap for the first time
     if(last)
     {
-        last->next = current_page;
+        last->next = current_block;
     }
-    block->size = n*PAGE_SIZE;
-    block->next = NULL;
-    block->free = 0; // this current block is not free anymore
+    current_block->size = n*PAGE_SIZE;
+    current_block->next = NULL;
+    current_block->free = 0; // this current block is not free anymore
 
-    return block;
+    return current_block;
 }
 
-block_meta *find_free_block(page_meta **last, size_t size)
+
+
+page_meta *find_free_block(page_meta **last, size_t size)
 {
-    block_meta *current = global_base;
+    page_meta *current = global_base;
     
     while(current && !(current->free && current->size >= size))
     {
@@ -250,13 +252,13 @@ block_meta *find_free_block(page_meta **last, size_t size)
 
 
 /*
-    Modified memory allocation function. This function 
+    Modified memory allocation function. 
 
 
 */
-paddr_t alloc_pages(uint32_t n)
+void* alloc_pages(uint32_t n)
 {
-    block_meta* block;
+    page_meta* block;
 
     //first call
     if(!global_base)
@@ -270,7 +272,7 @@ paddr_t alloc_pages(uint32_t n)
     }
     else
     {
-        block_meta *last = global_base; //update the last pointer
+        page_meta *last = global_base; //update the last pointer
         block = find_free_block(&last, n); //last gets updated and after the function is done running, last points to the last block that is occupied
         //failed to find a free block
         if(!block)
@@ -292,6 +294,13 @@ paddr_t alloc_pages(uint32_t n)
     return (block+1);
 }
 
+// this function returns the original page_meta, 
+// -1 moves the ptr from the user_data back to the struct page_meta. Since the ptr points to the original datatype the return type is page_meta
+page_meta* get_page_ptr(void* ptr)
+{
+    return (page_meta*)ptr - 1;
+}
+
 
 void free(void *ptr)
 {
@@ -301,7 +310,9 @@ void free(void *ptr)
         return;
     }
 
-    block_meta* block_ptr = get_block
+    page_meta* page_ptr = get_page_ptr(ptr);
+    assert(page_ptr->free == 0);
+    page_ptr->free = 1;
 
 }
 
