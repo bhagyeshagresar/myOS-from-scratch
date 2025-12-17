@@ -12,7 +12,7 @@ struct process *proc_a;
 struct process *proc_b;
 struct process *current_proc; //currently running process
 struct process *idle_proc;  //idle process
-
+void* global_base = NULL; //head of the linked list, initalised to NULL
 
 struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long arg4,
     long arg5, long fid, long eid){
@@ -158,11 +158,16 @@ struct process *create_process(uint32_t pc)
  * This function does not perform deallocation of memory
  * __free_ram is placed on a 4KB boundary due to ALIGN(4096) in the linker script. 
  * Therefore, the alloc_pages function always returns an address aligned to 4KB.
+   parameters:
+        uint32_t n : no. of pages to allocate
+
+    returns:
+        paddr_t: starting physical address of the newly allocated space in RAM
  */
-paddr_t alloc_pages(uint32_t n)
+paddr_t bump_allocator(uint32_t n)
 {
     //__free_ram and __free_ram_end represent the start and end addresses of the free ram
-    static paddr_t next_paddr = (paddr_t)__free_ram; //this is a static variable so its returned after function calls
+    static paddr_t next_paddr = (paddr_t)__free_ram; //this is a static variable so its retained after function calls
     paddr_t paddr = next_paddr;
     next_paddr += n*PAGE_SIZE; //allocate n pages
 
@@ -176,6 +181,128 @@ paddr_t alloc_pages(uint32_t n)
     memset((void*)paddr, 0, n*PAGE_SIZE); 
     return paddr;
  
+}
+
+
+
+/* 
+    This function is a modification of the bump allocator. this function allocates n pages + META_SIZE
+    Parameters:
+        uint32_t n : no. of pages to allocate
+
+
+*/
+void* sbrk(uint32_t n)
+{
+    //__free_ram and __free_ram_end represent the start and end addresses of the free ram
+    static paddr_t next_paddr = (paddr_t)__free_ram; //this is a static variable so its retained after function calls
+    paddr_t paddr = next_paddr;
+    next_paddr += (n*PAGE_SIZE) + META_SIZE; //allocate n pages + META_SIZE
+
+    //if it tried to allocate memory beyond __free_ram_end do a PANIC check
+    if(next_paddr > (paddr_t)__free_ram_end)
+    {
+        PANIC("ran out of memory\n");
+    }
+  
+    //ensure the allocated memory is initially to zero
+    memset((void*)paddr, 0, n*PAGE_SIZE); 
+    return (void*)paddr;
+}
+
+// If we don't find a free space we request space from the OS using sbrk and add our new block to the end of the linked list
+block_meta *request_space(page_meta *last, uint32_t n)
+{
+    page_meta *current_page;
+    current_page = sbrk(0); //get the current pointer
+    void* request = sbrk(n); //move the current poitner by n pages
+    assert((void*)current_page == request);
+    if(request == (void*)-1)
+    {
+        return NULL; //sbrk failed
+    }
+
+    //if find_free_block() function does not find a free space then the function stores the last block of memory used in the variable pointer "last"
+    //last will be NULL when allocating on the heap for the first time
+    if(last)
+    {
+        last->next = current_page;
+    }
+    block->size = n*PAGE_SIZE;
+    block->next = NULL;
+    block->free = 0; // this current block is not free anymore
+
+    return block;
+}
+
+block_meta *find_free_block(page_meta **last, size_t size)
+{
+    block_meta *current = global_base;
+    
+    while(current && !(current->free && current->size >= size))
+    {
+        *last = current;
+        current = current->next;
+    }
+    return current;
+}
+
+
+
+/*
+    Modified memory allocation function. This function 
+
+
+*/
+paddr_t alloc_pages(uint32_t n)
+{
+    block_meta* block;
+
+    //first call
+    if(!global_base)
+    {
+        block = request_space(NULL, n);
+        if(!block)
+        {
+            return NULL;
+        }
+        global_base = block;
+    }
+    else
+    {
+        block_meta *last = global_base; //update the last pointer
+        block = find_free_block(&last, n); //last gets updated and after the function is done running, last points to the last block that is occupied
+        //failed to find a free block
+        if(!block)
+        {
+            block = request_space(last, n);
+            if(!block)
+            {
+                return NULL;
+            }
+        }
+        //found a free block
+        else
+        {
+            block->free = 0; //mark it as not free anymore
+        }
+    }
+
+    //block points to the header (the metadata) of the allocated block but malloc returns the pointer to start address of the block so we do block+1 (increment by sizeof(block_meta))
+    return (block+1);
+}
+
+
+void free(void *ptr)
+{
+    //when we calll free(NULL), this evaluates to !0 -> 1, this condition makes sure function does nothing
+    if(!ptr)
+    {
+        return;
+    }
+
+    block_meta* block_ptr = get_block
+
 }
 
 

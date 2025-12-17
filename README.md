@@ -14,14 +14,31 @@ This project is implemented on Ubuntu 24.04
 
 ## Project Structure 
 
+├── common.c
+├── common.h
+├── kernel.c
+├── kernel.elf
+├── kernel.h
+├── kernel.ld
+├── kernel.map
+├── opensbi-riscv32-generic-fw_dynamic.bin
+├── README.md
+└── run.sh
+
+## Prerequisites:
+1) I am using Ubuntu 24.04
+2) QEMU Virtual Machine to emulate the hardware
+3) OpenSBI - for the QEMU virtual machine, this acts as a BIOS
 
 
+## Getting Started
 
+1) Install packages using apt: sudo apt update && sudo apt install -y clang llvm lld qemu-system-riscv32 curl
+2) Get OpenSBI: curl -LO https://github.com/qemu/qemu/raw/v8.0.4/pc-bios/opensbi-riscv32-generic-fw_dynamic.bin
 
-## Tools used:
-
-1) QEMU Virtual Machine to emulate the hardware
-2) OpenSBI - for the QEMU virtual machine, this acts as a BIOS
+## How to build and run?
+1) git clone https://github.com/bhagyeshagresar/myOS-from-scratch.git
+2) Go to project repository and run the shell scrip: $ ./run.sh
 
 
 ## Constrains (=r) and (r)
@@ -33,67 +50,19 @@ r constraint: This tells the compiler that the operand should be placed in a gen
 ## RISC-V Fundamentals
 
 ### RISC-V CPU modes
-Each CPU mode has different privileges
-M-mode -> OpenSBI (BIOS) operates in this mode
-S-mode -> kernel mode
-U-mode -> user mode (applicaton)
+Each CPU mode has different privileges:
+
+- **M-mode** → OpenSBI (BIOS) operates in this mode
+- **S-mode** → Kernel mode
+- **U-mode** → User mode (application)
+
 
 ## Excepion Handling
-PANIC: kernel.c:291: unexpected trap scause=00000002, stval=00000000, sepc=80200370
-value of scause = 2 means illegal instruction
-```c
 
-const char *s = "Hello World\n";
-    for(int i = 0; s[i] != '\0'; i++){
-        putchar(s[i]);
-    }
-    
-     memset(__bss, 0, (size_t)__bss_end - (size_t)__bss); //because dat in bss section is initialised to zero
-     WRITE_CSR(stvec, (uint32_t)kernel_entry); //tell the CPU where the exception handler is located
-    /*
-        This reads and writes the cycle register into x0. Since cycle is a read-only register, 
-        CPU determines that the instruction is invalid and triggers an illegal instruction exception.
-    */
-    __asm__ __volatile__("unimp");            //unimp is a pseudo instruction. the assembler translates this to : csrrw x0,cycle,x0
 
-llvm-addr2line -e kernel.elf 80200370
-/home/bhagyesh/myOS_project/kernel.c:313    //confirmed that this line matches with unimp instruction in kernel.c
-```
 
 ## Creating a simple memory allocator(bump allocator)
 
-### Testing our simple memory allocator
-The kernel initializes the BSS section and then allocates the first blocks of physical memory using a simple bump allocator before panicking.
-
-```c
-void kernel_main(void) {
-    // Zero out the entire BSS section
-    memset(__bss, 0, (size_t) __bss_end - (size_t) __bss);
-
-    // Allocate 2 pages (8KB) and 1 page (4KB)
-    paddr_t paddr0 = alloc_pages(2);
-    paddr_t paddr1 = alloc_pages(1);
-    
-    // Print the addresses of the allocated physical pages
-    printf("alloc_pages test: paddr0=%x\n", paddr0);
-    printf("alloc_pages test: paddr1=%x\n", paddr1);
-
-    PANIC("booted!");
-}
-
-$ ./run.sh
-alloc_pages test: paddr0=80221000
-alloc_pages test: paddr1=80223000
-PANIC: kernel.c:188: booted!
-
-
-$ llvm-nm kernel.elf | grep __free_ram 
-80221000 B __free_ram
-84221000 B __free_ram_end
-
-The symbol B means assigned to .bss section
-
-```
 
 ## Creation of multiple processes
 

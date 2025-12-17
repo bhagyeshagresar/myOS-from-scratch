@@ -45,6 +45,16 @@ struct trap_frame {
     uint32_t sp;
 } __attribute__((packed));
 
+//A linked list to represent a page 
+typedef struct page_meta
+{
+    paddr_t size; //size of the block
+    struct page_meta *next; //pointer to the next page 
+    int free; //boolean to check if the block is free
+}page_meta;
+
+#define META_SIZE sizeof(page_meta)
+
 
 //define a process object, also known as a Process Control Block(PCB)
 struct process
