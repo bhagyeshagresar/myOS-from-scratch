@@ -42,11 +42,6 @@ This project is implemented on Ubuntu 24.04
 2) Go to project repository and run the shell scrip: $ ./run.sh
 
 
-## Constrains (=r) and (r)
-
-= modifier: This specifies that the operand is write-only. The compiler is informed that the inline assembly code will overwrite the contents of the registers without needing to read their previous values.
-r constraint: This tells the compiler that the operand should be placed in a general-purpose register. The compiler is free to choose any available general-purpose register to fulfill this requirement.
-
 
 ## RISC-V Fundamentals
 
@@ -62,7 +57,9 @@ Each CPU mode has different privileges:
 
 
 
-## Creating a simple memory allocator
+## Creating my own memory allocator
+Kernel.c contains a custom memory allocation algorithm that returns a pointer to the newly allocated size in RAM for n no. of pages.
+This memory allocator efficiently handles metadata tracking. Furthermore, this kernel also has the feature to free the memory.
 
 
 ## Creation of multiple processes
@@ -71,3 +68,7 @@ Each CPU mode has different privileges:
 
 
 ### Testing context switch
+
+
+### Preemptive Scheduler
+The book deals with implementing a round-robin scheduler. The 

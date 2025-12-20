@@ -5,6 +5,14 @@
 #define PROC_UNUSED         0         // Unused process control strucuture
 #define PROC_RUNNABLE       1         // runnable process
 
+//Macros for constructing page tables in SV32
+#define SATP_SV32 (1u << 31)       //SATP_SV32 is a single bit in satp register which indicates enable paging in SV32 mode
+#define PAGE_V    (1 << 0)         // "valid bit" -> entry is enabled
+#define PAGE_R    (1 << 1)         //readable
+#define PAGE_W    (1 << 2)         //writable
+#define PAGE_X    (1 << 3)         //Executable
+#define PAGE_U    (1 << 4)         //User(accessible in user mode)
+
 struct sbiret{
     long error;
     long value;
@@ -54,6 +62,9 @@ typedef struct page_meta
 }page_meta;
 
 #define META_SIZE sizeof(page_meta)
+
+
+
 
 
 //define a process object, also known as a Process Control Block(PCB)

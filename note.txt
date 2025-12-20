@@ -123,6 +123,10 @@ while your host machine uses its default compiler (GCC) and C library (glibc) to
 the programs you write for your RISC-V emulator will be compiled by Clang and will need a separate RISC-V C library to run inside QEMU.
 
 
+## Constrains (=r) and (r)
+
+= modifier: This specifies that the operand is write-only. The compiler is informed that the inline assembly code will overwrite the contents of the registers without needing to read their previous values.
+r constraint: This tells the compiler that the operand should be placed in a general-purpose register. The compiler is free to choose any available general-purpose register to fulfill this requirement.
 
 //Context switch test bug 
 
@@ -216,8 +220,7 @@ void proc_b_entry(void)
     // PANIC("unreachable here!");
 
 
-
-
+//Below is all the old readme content
     ## Excepion Handling
 PANIC: kernel.c:291: unexpected trap scause=00000002, stval=00000000, sepc=80200370
 value of scause = 2 means illegal instruction
