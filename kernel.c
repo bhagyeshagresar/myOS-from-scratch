@@ -153,7 +153,7 @@ struct process *create_process(void (*entry)(void))
 
 }
 
-
+//right now the way this function is implemented, it is a cooperative round-robin scheduler but there is no time-slicing
 void yield(void)
 {
     //search for a runnable process
@@ -501,8 +501,8 @@ void kernel_main(void){
     idle_proc->pid = 0; // idle
     current_proc = idle_proc;
 
-    proc_a = create_process(proc_a_entry);
-    proc_b = create_process(proc_b_entry);
+    proc_a = create_process(&proc_a_entry);
+    proc_b = create_process(&proc_b_entry);
 
     yield();
     PANIC("switched to idle process");

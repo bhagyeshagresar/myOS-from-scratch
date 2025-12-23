@@ -350,3 +350,71 @@ AStarting process B
 BABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB
 
 ```
+
+/* 
+    Note from Chapter 5 :Hello World!
+
+    After preparing the arguments, the ecall instruction is executed in inline assembly. 
+    When this is called, the CPU's execution mode switches from kernel mode (S-Mode) to OpenSBI mode (M-Mode), 
+    and OpenSBI's processing handler is invoked. Once it's done, it switches back to kernel mode, and execution resumes after the ecall instruction.
+
+    The ecall instruction is also used when applications call the kernel (system calls). 
+    This instruction behaves like a function call to the more privileged CPU mode.
+
+*/
+
+
+/*
+    Note:
+     the defintion of a trap : The transfer of control to a trap handler caused by either an exception or interrupt.
+     An MRET or SRET instruction is used to return from a trap in M-mode or S-mode respectively. 
+            mtrap:
+                li      t0, 0x20
+                csrs    mip, t0
+                mret <- mret will return execution to supervisor mode
+     mideleg handles delegation of interrupts and medeleg handles delegation of exceptions. Both cause traps.
+     From the spec sheet: 
+     setting a bit in medeleg or mideleg will delegate the corresponding trap, when occurring in S-mode or U-mode, to the S-mode trap handler.
+
+*/
+
+/************Exception Handling************************************************\
+1) When an exception occurs CPU checks the medeleg register to determine which operation mode should handle the exception. 
+2) In our case, OpenSBI has already configured to handle U-Mode/S-mode exceptions in S-Mode's handler.
+3) CPU saves its state (registers) into various CSRs (see below).
+4) The value of the stvec register is set to the program counter, jumping to the kernel's exception handler.
+5) The exception handler saves general-purpose registers (i.e. the program state), and handles the exception.
+6) Once it's done, the exception handler restores the saved execution state and calls the sret instruction to 
+    resume execution from the point where the exception occurred.
+7) 
+
+
+/************Setting Timer Interrupts in Supervisor mode************************************************\
+Source : https://danielmangum.com/posts/risc-v-bytes-timer-interrupts/
+
+
+
+
+
+To enable interrupts in machine and supervisor mode, the bits 1 (mstatus.SIE) and 3 (mstatus.MIE)  must be set.
+Interrupts for higher-privilege modes, y>x, are always globally enabled regardless of the setting of the global yIE bit for the higher-privilege mode.
+The xPP bits (two bits wide) determine the next privilege level when returning from machine (mret) or supervisor (sret) mode.
+mstatus.MPIE and mstatus.SPIE. These correspond to the “machine previous interrupt enable” (mstatus.MPIE) and 
+“supervisor previous interrupt enable” (mstatus.SPIE) values. 
+These bits allow us to “remember” if interrupts were previously enabled at a given privilege level. 
+
+steps:
+In Machine mode:
+
+    1) enable supervisor timer interrupts by setting mstatus.SIE to 1 (for OS running in Supervisor mode, mstatus.MIE is already set)
+    2) set mstatus.MPP so that the cpu will return to s-mode
+    3) set mie.MTIE and mie.STIE to 1. Machine timer interrupts are what the hardware will trigger when the mtime value is greater than or equal to mtimecmp, 
+        so we need to ensure that mie.MTIE is set to 1. When a machine timer interrupt occurs, 
+        we then want to inform the operating system via a supervisor timer interrupt, so we also need to set mie.STIE = 1.
+    4) set mideleg.STIE to handle interrupts in supervisor mode.
+    5) In a mtrap handler set mip.STIP to trigger a supervisor interrupt.
+
+            mtrap:
+                li      t0, 0x20
+                csrs    mip, t0
+                mret <- return to supervisor mode

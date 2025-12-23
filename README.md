@@ -54,7 +54,13 @@ Each CPU mode has different privileges:
 
 
 ## Excepion Handling
+The exception hanling is configured to trigger in kernel mode(supervisor mode) and also serviced in kernel mode(supervisor mode).
+OpenSBI performs the delegation (medeleg register) for which mode should handle the exception, U-mode and S-Mode exceptions are handled in
+S-mode handler
 
+
+## Interrupt Handling
+The trap handling that I am trying to implement in this project is done using the sstc extension that adds S-level stimecmp csr.
 
 
 ## Creating my own memory allocator
