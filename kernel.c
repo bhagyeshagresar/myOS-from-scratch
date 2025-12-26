@@ -14,6 +14,7 @@ struct process *current_proc; //currently running process
 struct process *idle_proc;  //idle process
 void* global_base = NULL; //head of the linked list, initalised to NULL
 
+
 struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long arg4,
     long arg5, long fid, long eid){
     register long a0 __asm__("a0") = arg0; 
@@ -489,22 +490,80 @@ void handle_trap(struct trap_frame *f){
     PANIC("unexpected trap scause=%x, stval=%x, sepc=%x\n", scause, stval, user_pc);
 }
 
+
+// __attribute__((naked))
+// __attribute__((aligned(4)))
+// void timer_interrupt_handler(
+
+// )
+
+// The Program Counter(PC) will jump to base address+offset based on Table 32 of RISC-V ISA. 
+// Refer 12.1.2. Supervisor Trap Vector Base Address (stvec) Register in RISC-V Privileged ISA
+__attribute__((aligned(4)));
+void vector_table()
+{
+    __asm__ __volatile__(
+        "j kernel_entry\n"          // Excption handle stored at Base Address + 0
+        //"j timer_interrupt_handler\n"     // Timer Interrupt Hnadler stored at Base Address + 0x14 (refer Table 32 RISC-V Privileged ISA, the exceptioon code = 5 for timer interrupt)
+    );
+}
+
+
+
+void configure_trap_handling(bool trap_mode)
+{
+    uint32_t base_address;
+    //if trap_mode is set, configure trap handling in vectored mode
+    if(trap_mode)
+    {
+        // vectored mode: BASE = vector_table, MODE = 1
+        base_address = ((uint32_t)vector_table & ~0x03) | 0x01;
+    }
+    else
+    {
+          // direct mode: BASE = kernel_entry, MODE = 0
+          base_address = ((uint32_t)kernel_entry & ~0x03) | 0x00;
+    }
+
+    WRITE_CSR(stvec, (uint32_t) base_address);
+
+}
+
+
+
+void enable_supervisor_interrupt()
+{
+    __asm__ __volatile__(
+        "csrsi sstatus, 2\n"    //set the supervisor enable bit
+        : //no output operands
+        : //no input operands
+        ://no clobbered registers
+    );
+}
+
+
+
+
 void kernel_main(void){
     
     memset(__bss, 0, (size_t) __bss_end - (size_t) __bss);
 
     printf("\n\n");
 
-    WRITE_CSR(stvec, (uint32_t) kernel_entry);
+    //configure trap handling in vector mode since we are dealing with exceptions and interrupts both
+    configure_trap_handling(true);
 
-    idle_proc = create_process(NULL);
-    idle_proc->pid = 0; // idle
-    current_proc = idle_proc;
+    //Enable sstatus.SIE bit
+    enable_supervisor_interrupt();
 
-    proc_a = create_process(&proc_a_entry);
-    proc_b = create_process(&proc_b_entry);
+    // idle_proc = create_process(NULL);
+    // idle_proc->pid = 0; // idle
+    // current_proc = idle_proc;
 
-    yield();
+    // proc_a = create_process(&proc_a_entry);
+    // proc_b = create_process(&proc_b_entry);
+
+    // yield();
     PANIC("switched to idle process");
 
 }

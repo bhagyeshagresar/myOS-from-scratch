@@ -12,6 +12,8 @@
 #define PAGE_W    (1 << 2)         //writable
 #define PAGE_X    (1 << 3)         //Executable
 #define PAGE_U    (1 << 4)         //User(accessible in user mode)
+#define SSTATUS_SIE (1u << 1)       //Supervisor Interrupt Enable bit
+#define STVEC_VECTORED_MODE (1 << 0)    //Set Mode bit for vectored mode
 
 struct sbiret{
     long error;
