@@ -499,7 +499,6 @@ void handle_trap(struct trap_frame *f){
 
 // The Program Counter(PC) will jump to base address+offset based on Table 32 of RISC-V ISA. 
 // Refer 12.1.2. Supervisor Trap Vector Base Address (stvec) Register in RISC-V Privileged ISA
-__attribute__((aligned(4)));
 void vector_table()
 {
     __asm__ __volatile__(
@@ -529,16 +528,36 @@ void configure_trap_handling(bool trap_mode)
 
 }
 
-
-
+//enables interrupts to occur in s-mode
 void enable_supervisor_interrupt()
 {
     __asm__ __volatile__(
-        "csrsi sstatus, 2\n"    //set the supervisor enable bit
+        "csrsi sstatus, 2\n"    //set the supervisor enable bit (sstatus.sie)
         : //no output operands
         : //no input operands
         ://no clobbered registers
     );
+}
+
+//enable timer interrupt sie.STIE
+void enable_timer_interrupt()
+{
+    __asm__ __volatile__(
+        "li t1, 32\n\t"
+        "csrs sie, t1\n" // Timer interrupt enable flag: sie.STIE
+        ::: /* Clobbered registers: */ "t1"
+
+    );
+}
+
+//function to clear timer interrupt pending bit 
+void clear_timer_interrupt_pending_flag()
+{
+    __asm__ __volatile__(
+        "li t0, 32\n\t"
+        "csrc sip, t0\n"
+        ::: /* Clobbered registers: */ "t0"
+    )
 }
 
 
