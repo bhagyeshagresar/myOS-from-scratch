@@ -70,7 +70,7 @@ void putchar(char ch){
 
 //delay function implements a busy wait to prevent the character output from becoming too fast, which would make your terminal unresponsive
 void delay(void) {
-    for (int i = 0; i < 30000000; i++)
+    for (int i = 0; i < 200000000; i++)
         __asm__ __volatile__("nop"); // do nothing
 }
 
@@ -180,7 +180,7 @@ struct process *create_process(void (*entry)(void))
 
 }
 
-//right now the way this function is implemented, it is a cooperative round-robin scheduler but there is no time-slicing
+//scheduler function
 void yield(void)
 {
     //search for a runnable process
@@ -228,9 +228,9 @@ void proc_a_entry(void)
     {
         putchar('A');
         // switch_context(&proc_a->sp, &proc_b->sp);
-        // delay(); //spend some time here before you output B
-        yield();
-        delay();
+        delay(); //spend some time here before you output B
+        //yield(); needed for cooperative multitasking
+        //delay();
     }
 }
 
@@ -242,7 +242,7 @@ void proc_b_entry(void)
         putchar('B');
         // switch_context(&proc_b->sp, &proc_a->sp);
         // delay(); //spend some time here before you output A
-        yield();
+        //yield();
         delay();
     }
 }
@@ -595,13 +595,12 @@ void handle_exception_trap(struct trap_frame *f){
 //Handle the timer interrupt
 void handle_timer_trap()
 {
-    uint32_t scause = READ_CSR(scause);  //scause - type of exception. The kernel reads this to identify the type of exception
-    uint32_t stval = READ_CSR(stval);    //stval - Additional information about the exception (e.g., memory address that caused the exception). Depends on the type of exception.
-    uint32_t user_pc = READ_CSR(sepc);   //sepc - Program counter at the point where the exception occurred.
+   
     clear_timer_interrupt_pending_flag();
-    //yield();
+    yield();
     printf("Timer fired\n");
     write_to_stimecmp(read_rtc() + 4000000); 
+    //yield();
 
 }
 
@@ -773,8 +772,16 @@ void timer_interrupt_handler(void) {
 
 // }
 
-// The Program Counter(PC) will jump to base address+offset based on Table 32 of RISC-V ISA. 
-// Refer 12.1.2. Supervisor Trap Vector Base Address (stvec) Register in RISC-V Privileged ISA
+/*
+    The Program Counter(PC) will jump to base address+offset based on Table 32 of RISC-V ISA. 
+    Refer 12.1.2. Supervisor Trap Vector Base Address (stvec) Register in RISC-V Privileged ISA
+    From the Spec:
+    When MODE=Vectored, all synchronous
+    exceptions into supervisor mode cause the pc to be set to the address in the BASE field, whereas
+    interrupts cause the pc to be set to the address in the BASE field plus four times the interrupt cause
+    number. For example, a supervisor-mode timer interrupt (see Table 32) causes the pc to be set to
+    BASE+0x14.
+*/
 //__attribute__((naked))
 //__attribute__((aligned(4)))
 void vector_table()
@@ -844,26 +851,38 @@ void kernel_main(void){
     configure_trap_handling(true);
     //WRITE_CSR(stvec, (uint32_t)timer_interrupt_handler);
 
-    //Enable sstatus.SIE bit
-    enable_supervisor_interrupt();
-
-    //Enable the timer interrupt sie.STIE
-    enable_timer_interrupt();
+   
     //__asm__ __volatile__("unimp"); 
-    __asm__ __volatile__("ebreak");
+    //__asm__ __volatile__("ebreak");
 
     //initialise the timer interrupt for the first time
-    write_to_stimecmp(read_rtc() + 1000000);
-   
+    
 
+    idle_proc = create_process(NULL);
+    idle_proc->pid = 0; // idle
+    current_proc = idle_proc;
+
+    proc_a = create_process(proc_a_entry);
+    proc_b = create_process(proc_b_entry);
+    yield();
+
+   
+     //Enable sstatus.SIE bit
+     enable_supervisor_interrupt();
+
+     //Enable the timer interrupt sie.STIE
+    enable_timer_interrupt();
+    write_to_stimecmp(read_rtc() + 1000000);
     // idle_proc = create_process(NULL);
     // idle_proc->pid = 0; // idle
     // current_proc = idle_proc;
 
-    // while(1)
-    // {
-    //     printf("Entered Main Thread\n");
-    // }
+    while(1)
+    {
+        delay();
+        printf("main thread\n");
+
+    }
 
     // proc_a = create_process(&proc_a_entry);
     // proc_b = create_process(&proc_b_entry);
