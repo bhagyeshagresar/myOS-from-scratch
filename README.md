@@ -77,4 +77,4 @@ This memory allocator efficiently handles metadata tracking. Furthermore, this k
 
 
 ### Preemptive Scheduler
-The book deals with implementing a round-robin scheduler. The 
+The book deals with implementing a cooperative scheduler.

@@ -100,7 +100,7 @@ struct process
 ({                                                                      \
     unsigned long __tmp;                                                \
     __asm__ __volatile__("csrr %0, " #reg : "=r"(__tmp));               \
-    __tmp;                                                              \
+    __tmp;                                                             \
 })                                                                      \
 
 //Macro to write to a specified CSR register

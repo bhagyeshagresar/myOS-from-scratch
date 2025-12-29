@@ -418,3 +418,22 @@ In Machine mode:
                 li      t0, 0x20
                 csrs    mip, t0
                 mret <- return to supervisor mode
+
+
+
+
+
+
+
+// WRITE_CSR(stvec, (uint32_t) kernel_entry);
+    // //__asm__ __volatile__("unimp"); // new
+    // idle_proc = create_process(NULL);
+    // idle_proc->pid = 0; // idle
+    // current_proc = idle_proc;
+
+    // proc_a = create_process(proc_a_entry);
+    // proc_b = create_process(proc_b_entry);
+
+    // yield();
+    // //PANIC("switched to idle process");
+    //  printf("Switched to idle process");

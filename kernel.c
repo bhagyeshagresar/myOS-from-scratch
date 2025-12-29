@@ -15,6 +15,32 @@ struct process *idle_proc;  //idle process
 void* global_base = NULL; //head of the linked list, initalised to NULL
 
 
+//read the RTC counter
+uint32_t read_rtc()
+{
+    uint32_t rtc_val = READ_CSR(time);
+    return rtc_val;
+}
+
+
+//write to stimecmp
+void write_to_stimecmp(uint64_t x)
+{
+    WRITE_CSR(0x14d, x);
+}
+
+//function to clear timer interrupt pending bit 
+void clear_timer_interrupt_pending_flag()
+{
+    __asm__ __volatile__(
+        "li t0, 32\n\t"
+        "csrc sip, t0\n"
+        ::: /* Clobbered registers: */ "t0"
+    );
+}
+
+
+
 struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long arg4,
     long arg5, long fid, long eid){
     register long a0 __asm__("a0") = arg0; 
@@ -390,14 +416,90 @@ void free(void *ptr)
 
 }
 
+// __attribute__((naked))
+// __attribute__((aligned(4)))
+// void kernel_entry(void) {
+//     __asm__ __volatile__(
+//         "csrw sscratch, sp\n"
+//         "addi sp, sp, -4 * 31\n"
+//         "sw ra,  4 * 0(sp)\n"
+//         "sw gp,  4 * 1(sp)\n"
+//         "sw tp,  4 * 2(sp)\n"
+//         "sw t0,  4 * 3(sp)\n"
+//         "sw t1,  4 * 4(sp)\n"
+//         "sw t2,  4 * 5(sp)\n"
+//         "sw t3,  4 * 6(sp)\n"
+//         "sw t4,  4 * 7(sp)\n"
+//         "sw t5,  4 * 8(sp)\n"
+//         "sw t6,  4 * 9(sp)\n"
+//         "sw a0,  4 * 10(sp)\n"
+//         "sw a1,  4 * 11(sp)\n"
+//         "sw a2,  4 * 12(sp)\n"
+//         "sw a3,  4 * 13(sp)\n"
+//         "sw a4,  4 * 14(sp)\n"
+//         "sw a5,  4 * 15(sp)\n"
+//         "sw a6,  4 * 16(sp)\n"
+//         "sw a7,  4 * 17(sp)\n"
+//         "sw s0,  4 * 18(sp)\n"
+//         "sw s1,  4 * 19(sp)\n"
+//         "sw s2,  4 * 20(sp)\n"
+//         "sw s3,  4 * 21(sp)\n"
+//         "sw s4,  4 * 22(sp)\n"
+//         "sw s5,  4 * 23(sp)\n"
+//         "sw s6,  4 * 24(sp)\n"
+//         "sw s7,  4 * 25(sp)\n"
+//         "sw s8,  4 * 26(sp)\n"
+//         "sw s9,  4 * 27(sp)\n"
+//         "sw s10, 4 * 28(sp)\n"
+//         "sw s11, 4 * 29(sp)\n"
 
+//         "csrr a0, sscratch\n"
+//         "sw a0, 4 * 30(sp)\n"
+
+//         "mv a0, sp\n"
+//         "call handle_exception_trap\n"
+
+//         "lw ra,  4 * 0(sp)\n"
+//         "lw gp,  4 * 1(sp)\n"
+//         "lw tp,  4 * 2(sp)\n"
+//         "lw t0,  4 * 3(sp)\n"
+//         "lw t1,  4 * 4(sp)\n"
+//         "lw t2,  4 * 5(sp)\n"
+//         "lw t3,  4 * 6(sp)\n"
+//         "lw t4,  4 * 7(sp)\n"
+//         "lw t5,  4 * 8(sp)\n"
+//         "lw t6,  4 * 9(sp)\n"
+//         "lw a0,  4 * 10(sp)\n"
+//         "lw a1,  4 * 11(sp)\n"
+//         "lw a2,  4 * 12(sp)\n"
+//         "lw a3,  4 * 13(sp)\n"
+//         "lw a4,  4 * 14(sp)\n"
+//         "lw a5,  4 * 15(sp)\n"
+//         "lw a6,  4 * 16(sp)\n"
+//         "lw a7,  4 * 17(sp)\n"
+//         "lw s0,  4 * 18(sp)\n"
+//         "lw s1,  4 * 19(sp)\n"
+//         "lw s2,  4 * 20(sp)\n"
+//         "lw s3,  4 * 21(sp)\n"
+//         "lw s4,  4 * 22(sp)\n"
+//         "lw s5,  4 * 23(sp)\n"
+//         "lw s6,  4 * 24(sp)\n"
+//         "lw s7,  4 * 25(sp)\n"
+//         "lw s8,  4 * 26(sp)\n"
+//         "lw s9,  4 * 27(sp)\n"
+//         "lw s10, 4 * 28(sp)\n"
+//         "lw s11, 4 * 29(sp)\n"
+//         "lw sp,  4 * 30(sp)\n"
+//         "sret\n"
+//     );
+// }
 
 
 //Kernel exception handler. Store the address of this function in stvec register
 __attribute__((naked))
 __attribute__((aligned(4)))
 void kernel_entry(void){
-    __asm__ __volatile(
+    __asm__ __volatile__(
 
         
         "csrrw sp, sscratch, sp\n"      // Retrieve the kernel stack of the running process from sscratch. sp now points to kernel stack and not user stack
@@ -442,7 +544,7 @@ void kernel_entry(void){
         "csrw sscratch, a0\n"       //restore the stack pointer value(sscratch had the user stack pointer)
 
         "mv a0, sp\n"              //move the curren address of the stack frame into a0, In the RISC-V calling convention, the first function argument must be placed in the a0 register
-        "call handle_trap\n"
+        "call handle_exception_trap\n"
         
         "lw ra,  4 * 0(sp)\n"       //after the handle_trap returns the kernel resumes the interrupted process, loads the trap frame back to the GPRs
         "lw gp,  4 * 1(sp)\n"
@@ -480,8 +582,8 @@ void kernel_entry(void){
     );
 }
 
-//Handle the exception in C
-void handle_trap(struct trap_frame *f){
+//Handle the exception
+void handle_exception_trap(struct trap_frame *f){
     (void)f; // suppress unused parameter warning
     uint32_t scause = READ_CSR(scause);  //scause - type of exception. The kernel reads this to identify the type of exception
     uint32_t stval = READ_CSR(stval);    //stval - Additional information about the exception (e.g., memory address that caused the exception). Depends on the type of exception.
@@ -490,12 +592,186 @@ void handle_trap(struct trap_frame *f){
     PANIC("unexpected trap scause=%x, stval=%x, sepc=%x\n", scause, stval, user_pc);
 }
 
+//Handle the timer interrupt
+void handle_timer_trap()
+{
+    uint32_t scause = READ_CSR(scause);  //scause - type of exception. The kernel reads this to identify the type of exception
+    uint32_t stval = READ_CSR(stval);    //stval - Additional information about the exception (e.g., memory address that caused the exception). Depends on the type of exception.
+    uint32_t user_pc = READ_CSR(sepc);   //sepc - Program counter at the point where the exception occurred.
+    clear_timer_interrupt_pending_flag();
+    //yield();
+    printf("Timer fired\n");
+    write_to_stimecmp(read_rtc() + 4000000); 
+
+}
+
+
+
+__attribute__((naked))
+__attribute__((aligned(4)))
+void timer_interrupt_handler(void) {
+    __asm__ __volatile__(
+        "csrw sscratch, sp\n"
+        "addi sp, sp, -4 * 31\n"
+        "sw ra,  4 * 0(sp)\n"
+        "sw gp,  4 * 1(sp)\n"
+        "sw tp,  4 * 2(sp)\n"
+        "sw t0,  4 * 3(sp)\n"
+        "sw t1,  4 * 4(sp)\n"
+        "sw t2,  4 * 5(sp)\n"
+        "sw t3,  4 * 6(sp)\n"
+        "sw t4,  4 * 7(sp)\n"
+        "sw t5,  4 * 8(sp)\n"
+        "sw t6,  4 * 9(sp)\n"
+        "sw a0,  4 * 10(sp)\n"
+        "sw a1,  4 * 11(sp)\n"
+        "sw a2,  4 * 12(sp)\n"
+        "sw a3,  4 * 13(sp)\n"
+        "sw a4,  4 * 14(sp)\n"
+        "sw a5,  4 * 15(sp)\n"
+        "sw a6,  4 * 16(sp)\n"
+        "sw a7,  4 * 17(sp)\n"
+        "sw s0,  4 * 18(sp)\n"
+        "sw s1,  4 * 19(sp)\n"
+        "sw s2,  4 * 20(sp)\n"
+        "sw s3,  4 * 21(sp)\n"
+        "sw s4,  4 * 22(sp)\n"
+        "sw s5,  4 * 23(sp)\n"
+        "sw s6,  4 * 24(sp)\n"
+        "sw s7,  4 * 25(sp)\n"
+        "sw s8,  4 * 26(sp)\n"
+        "sw s9,  4 * 27(sp)\n"
+        "sw s10, 4 * 28(sp)\n"
+        "sw s11, 4 * 29(sp)\n"
+
+        "csrr a0, sscratch\n"
+        "sw a0, 4 * 30(sp)\n"
+
+        "mv a0, sp\n"
+        "call handle_timer_trap\n"
+
+        "lw ra,  4 * 0(sp)\n"
+        "lw gp,  4 * 1(sp)\n"
+        "lw tp,  4 * 2(sp)\n"
+        "lw t0,  4 * 3(sp)\n"
+        "lw t1,  4 * 4(sp)\n"
+        "lw t2,  4 * 5(sp)\n"
+        "lw t3,  4 * 6(sp)\n"
+        "lw t4,  4 * 7(sp)\n"
+        "lw t5,  4 * 8(sp)\n"
+        "lw t6,  4 * 9(sp)\n"
+        "lw a0,  4 * 10(sp)\n"
+        "lw a1,  4 * 11(sp)\n"
+        "lw a2,  4 * 12(sp)\n"
+        "lw a3,  4 * 13(sp)\n"
+        "lw a4,  4 * 14(sp)\n"
+        "lw a5,  4 * 15(sp)\n"
+        "lw a6,  4 * 16(sp)\n"
+        "lw a7,  4 * 17(sp)\n"
+        "lw s0,  4 * 18(sp)\n"
+        "lw s1,  4 * 19(sp)\n"
+        "lw s2,  4 * 20(sp)\n"
+        "lw s3,  4 * 21(sp)\n"
+        "lw s4,  4 * 22(sp)\n"
+        "lw s5,  4 * 23(sp)\n"
+        "lw s6,  4 * 24(sp)\n"
+        "lw s7,  4 * 25(sp)\n"
+        "lw s8,  4 * 26(sp)\n"
+        "lw s9,  4 * 27(sp)\n"
+        "lw s10, 4 * 28(sp)\n"
+        "lw s11, 4 * 29(sp)\n"
+        "lw sp,  4 * 30(sp)\n"
+        "sret\n"
+    );
+}
+
 
 // __attribute__((naked))
 // __attribute__((aligned(4)))
-// void timer_interrupt_handler(
+// void timer_interrupt_handler(void)
+// {
 
-// )
+//     __asm__ __volatile__(
+//         "csrrw sp, sscratch, sp\n"      // Retrieve the kernel stack of the running process from sscratch. sp now points to kernel stack and not user stack
+//                                         //sscratch holds the oiginal value of sp from the user stack
+//         //"csrw sscratch, sp\n"       //temporarily save user mode stack pointer at the time of exception occurrence
+//         "addi sp, sp, -4*31\n"      //move the stack pointer down by 4x31 = 124 bytes(allocation)
+//         "sw ra, 4*0(sp)\n"          //store the value of ra at an offset of 0bytes from the address held in sp. do the same for all the
+//         "sw gp,  4 * 1(sp)\n"       //these are the general purpose registers of the interrupted task and are stored in the newly created
+//         "sw tp,  4 * 2(sp)\n"       //kernel stack
+//         "sw t0,  4 * 3(sp)\n"
+//         "sw t1,  4 * 4(sp)\n"
+//         "sw t2,  4 * 5(sp)\n"
+//         "sw t3,  4 * 6(sp)\n"
+//         "sw t4,  4 * 7(sp)\n"
+//         "sw t5,  4 * 8(sp)\n"
+//         "sw t6,  4 * 9(sp)\n"
+//         "sw a0,  4 * 10(sp)\n"
+//         "sw a1,  4 * 11(sp)\n"
+//         "sw a2,  4 * 12(sp)\n"
+//         "sw a3,  4 * 13(sp)\n"
+//         "sw a4,  4 * 14(sp)\n"
+//         "sw a5,  4 * 15(sp)\n"
+//         "sw a6,  4 * 16(sp)\n"
+//         "sw a7,  4 * 17(sp)\n"
+//         "sw s0,  4 * 18(sp)\n"
+//         "sw s1,  4 * 19(sp)\n"
+//         "sw s2,  4 * 20(sp)\n"
+//         "sw s3,  4 * 21(sp)\n"
+//         "sw s4,  4 * 22(sp)\n"
+//         "sw s5,  4 * 23(sp)\n"
+//         "sw s6,  4 * 24(sp)\n"
+//         "sw s7,  4 * 25(sp)\n"
+//         "sw s8,  4 * 26(sp)\n"
+//         "sw s9,  4 * 27(sp)\n"
+//         "sw s10, 4 * 28(sp)\n"
+//         "sw s11, 4 * 29(sp)\n"
+
+//         "csrr a0, sscratch\n"      //the user mode's stack poiinter at the point of exception is stored in a0
+//         "sw a0, 4*30(sp)\n"        //store the user mode's stack pointer to the stack frame so now the whole context is saved, a0 may now hold a garbage value
+        
+//         "addi a0, sp, 4 * 31\n"   //reset the kernel stack
+//         "csrw sscratch, a0\n"       //restore the stack pointer value(sscratch had the user stack pointer)
+
+//         "mv a0, sp\n"              //move the curren address of the stack frame into a0, In the RISC-V calling convention, the first function argument must be placed in the a0 register
+//         "call handle_timer_trap\n"
+        
+//         "lw ra,  4 * 0(sp)\n"       //after the handle_trap returns the kernel resumes the interrupted process, loads the trap frame back to the GPRs
+//         "lw gp,  4 * 1(sp)\n"
+//         "lw tp,  4 * 2(sp)\n"
+//         "lw t0,  4 * 3(sp)\n"
+//         "lw t1,  4 * 4(sp)\n"
+//         "lw t2,  4 * 5(sp)\n"
+//         "lw t3,  4 * 6(sp)\n"
+//         "lw t4,  4 * 7(sp)\n"
+//         "lw t5,  4 * 8(sp)\n"
+//         "lw t6,  4 * 9(sp)\n"
+//         "lw a0,  4 * 10(sp)\n"
+//         "lw a1,  4 * 11(sp)\n"
+//         "lw a2,  4 * 12(sp)\n"
+//         "lw a3,  4 * 13(sp)\n"
+//         "lw a4,  4 * 14(sp)\n"
+//         "lw a5,  4 * 15(sp)\n"
+//         "lw a6,  4 * 16(sp)\n"
+//         "lw a7,  4 * 17(sp)\n"
+//         "lw s0,  4 * 18(sp)\n"
+//         "lw s1,  4 * 19(sp)\n"
+//         "lw s2,  4 * 20(sp)\n"
+//         "lw s3,  4 * 21(sp)\n"
+//         "lw s4,  4 * 22(sp)\n"
+//         "lw s5,  4 * 23(sp)\n"
+//         "lw s6,  4 * 24(sp)\n"
+//         "lw s7,  4 * 25(sp)\n"
+//         "lw s8,  4 * 26(sp)\n"
+//         "lw s9,  4 * 27(sp)\n"
+//         "lw s10, 4 * 28(sp)\n"
+//         "lw s11, 4 * 29(sp)\n"
+//         "lw sp,  4 * 30(sp)\n"  
+//         "sret\n"                //call the sret instruction to resume execution from the point where the exception occurred.
+        
+//     );
+
+// }
 
 // The Program Counter(PC) will jump to base address+offset based on Table 32 of RISC-V ISA. 
 // Refer 12.1.2. Supervisor Trap Vector Base Address (stvec) Register in RISC-V Privileged ISA
@@ -503,7 +779,7 @@ void vector_table()
 {
     __asm__ __volatile__(
         "j kernel_entry\n"          // Excption handle stored at Base Address + 0
-        //"j timer_interrupt_handler\n"     // Timer Interrupt Hnadler stored at Base Address + 0x14 (refer Table 32 RISC-V Privileged ISA, the exceptioon code = 5 for timer interrupt)
+        "j timer_interrupt_handler\n"     // Timer Interrupt Hnadler stored at Base Address + 0x14 (refer Table 32 RISC-V Privileged ISA, the exceptioon code = 5 for timer interrupt)
     );
 }
 
@@ -550,30 +826,26 @@ void enable_timer_interrupt()
     );
 }
 
-//function to clear timer interrupt pending bit 
-void clear_timer_interrupt_pending_flag()
-{
-    __asm__ __volatile__(
-        "li t0, 32\n\t"
-        "csrc sip, t0\n"
-        ::: /* Clobbered registers: */ "t0"
-    )
-}
-
-
-
 
 void kernel_main(void){
     
     memset(__bss, 0, (size_t) __bss_end - (size_t) __bss);
+    printf("Entered the kernel");
+    // printf("\n\n");
 
-    printf("\n\n");
-
+    
     //configure trap handling in vector mode since we are dealing with exceptions and interrupts both
-    configure_trap_handling(true);
+    //configure_trap_handling(true);
+    WRITE_CSR(stvec, (uint32_t)timer_interrupt_handler);
 
     //Enable sstatus.SIE bit
     enable_supervisor_interrupt();
+
+    //Enable the timer interrupt sie.STIE
+    enable_timer_interrupt();
+
+    //initialise the timer interrupt for the first time
+    write_to_stimecmp(read_rtc() + 1000000);
 
     // idle_proc = create_process(NULL);
     // idle_proc->pid = 0; // idle
@@ -581,9 +853,9 @@ void kernel_main(void){
 
     // proc_a = create_process(&proc_a_entry);
     // proc_b = create_process(&proc_b_entry);
-
+    PANIC("Entered the IDLE Process");
     // yield();
-    PANIC("switched to idle process");
+    
 
 }
 
