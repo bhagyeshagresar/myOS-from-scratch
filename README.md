@@ -1,4 +1,4 @@
-# myOS from scratch
+# microOS_riscv
 
 Writing my own OS for a 32bit RISC-V architecture. The implementation is based off of this project: 
 [text](https://operating-system-in-1000-lines.vercel.app/en/)
@@ -61,19 +61,12 @@ S-mode handler
 
 ## Interrupt Handling
 The trap handling that I am trying to implement in this project is done using the sstc extension that adds S-level stimecmp csr.
+Since the kernel deals with exceptions and interrupts both, vectored mode configuration is implemented.
 
 
 ## Creating my own memory allocator
 Kernel.c contains a custom memory allocation algorithm that returns a pointer to the newly allocated size in RAM for n no. of pages.
 This memory allocator efficiently handles metadata tracking. Furthermore, this kernel also has the feature to free the memory.
-
-
-## Creation of multiple processes
-
-### Process Control Block
-
-
-### Testing context switch
 
 
 ### Preemptive Scheduler

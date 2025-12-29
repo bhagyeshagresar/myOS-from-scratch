@@ -13,7 +13,7 @@ struct process *proc_b;
 struct process *current_proc; //currently running process
 struct process *idle_proc;  //idle process
 void* global_base = NULL; //head of the linked list, initalised to NULL
-
+volatile int switch_task = 0;
 
 //read the RTC counter
 uint32_t read_rtc()
@@ -233,6 +233,7 @@ void proc_a_entry(void)
         //delay();
     }
 }
+
 
 void proc_b_entry(void)
 {
@@ -597,10 +598,9 @@ void handle_timer_trap()
 {
    
     clear_timer_interrupt_pending_flag();
-    yield();
     printf("Timer fired\n");
+    switch_task = 1;
     write_to_stimecmp(read_rtc() + 4000000); 
-    //yield();
 
 }
 
@@ -864,7 +864,7 @@ void kernel_main(void){
 
     proc_a = create_process(proc_a_entry);
     proc_b = create_process(proc_b_entry);
-    yield();
+    //yield();
 
    
      //Enable sstatus.SIE bit
@@ -879,6 +879,12 @@ void kernel_main(void){
 
     while(1)
     {
+        if(switch_task)
+        {
+            printf("switching task...\n");
+            yield();
+            switch_task = 0;
+        }
         delay();
         printf("main thread\n");
 
@@ -887,7 +893,7 @@ void kernel_main(void){
     // proc_a = create_process(&proc_a_entry);
     // proc_b = create_process(&proc_b_entry);
     PANIC("Entered the IDLE Process");
-    // yield();
+
     
 
 }
